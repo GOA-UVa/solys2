@@ -1,0 +1,1 @@
+from solys2_moon import solys2_moon as s2m

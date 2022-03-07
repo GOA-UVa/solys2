@@ -1,8 +1,0 @@
-pyproject.toml
-setup.cfg
-setup.py
-src/solys2_moon.egg-info/PKG-INFO
-src/solys2_moon.egg-info/SOURCES.txt
-src/solys2_moon.egg-info/dependency_links.txt
-src/solys2_moon.egg-info/requires.txt
-src/solys2_moon.egg-info/top_level.txt
