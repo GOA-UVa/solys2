@@ -13,8 +13,32 @@ class TrackerMode(Enum):
     REMOTE = 'REMOTE'
     CLOCK = 'CLOCK'
 
+ERROR_CODES = {
+    '1': 'framing error.',
+    '2': 'reserved for future use.',
+    '3': 'unrecognized command.',
+    '4': 'message too long.',
+    '5': 'unimplemented instruction or non decodable parameters.',
+    '6': 'motion queue is full, movement command rejected.',
+    '7': 'travel bounds exceeded.',
+    '8': 'maximum velocity exceeded.',
+    '9': 'maximum acceleration exceeded.',
+    'A': 'instrument is operating autonomously, command rejected.',
+    'B': 'invalid adjustment size.',
+    'C': 'invalid total adjustment.',
+    'D': 'duration out of range.',
+    'E': 'reserved for future use.',
+    'F': 'illegal extent specified.',
+    'G': 'attempt to change password protected data.',
+    'Y': 'hardware failure detected.',
+    'Z': 'illegal internal firmware state.',
+    'Q': 'Command is protected  password.',
+    'R': '??????',
+    'P': 'Wrong password.'
+}
+
 class Solys2:
-    def __init__(self, ip: str, port: int = 15000, password: str = "65535"):
+    def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
         self.ip = ip
         self.port = port
         self.sun_sensor = False
