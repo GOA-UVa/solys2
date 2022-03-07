@@ -13,7 +13,6 @@ class OutCode(Enum):
     ERROR = 0
     ANSWER = 1
 
-
 def read_output(s: str, cmd: str) -> Tuple[List[float], 'OutCode']:
     rstrip = s.strip()
     out_code = OutCode.ANSWER
@@ -32,14 +31,14 @@ def read_output(s: str, cmd: str) -> Tuple[List[float], 'OutCode']:
             print("ERROR {}: {}".format(err_code, s2m.ERROR_CODES[err_code]))
     return numbers, out_code
 
-def send_command(cmd: str):
-    resp = s2m.connection.send_command(cmd)
+def send_command(s: s2m.connection.SolysConnection, cmd: str):
+    resp = s.send_cmd(cmd)
     print(cmd)
     print("Respuesta: {}".format(resp))
     nums, out = read_output(resp, cmd)
     while out == OutCode.NONE:
         time.sleep(0.1)
-        resp = s2m.connection.recv_msg()
+        resp = s.recv_msg()
         nums, out = read_output(resp, cmd)
         print("Respuesta: {}".format(resp))
 
@@ -48,13 +47,13 @@ def main():
     cmd_pwd = "PW solys"
     cmd_prot = "PR 0"
     cmd = "PO"
-    s2m.connection.connect(TCP_IP, TCP_PORT)
-    send_command(cmd_pwd)
-    send_command(cmd_prot)    
-    send_command(cmd) 
-    send_command("MS")
+    s = s2m.connection.SolysConnection(TCP_IP, TCP_PORT)
+    send_command(s, cmd_pwd)
+    send_command(s, cmd_prot)    
+    send_command(s, cmd) 
+    send_command(s, "MS")
     #send_command("PO 1 40")
-    s2m.connection.close_connection()
+    s.close()
 
 if __name__ == "__main__":
     main()
