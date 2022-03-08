@@ -1,4 +1,5 @@
 import socket
+import time
 
 _RECV_BUFFER_SIZE = 1024
 _SECS_TIMEOUT = 10
@@ -19,7 +20,6 @@ class SolysConnection:
     def connect(self, ip: str, port: int):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(_SECS_TIMEOUT)
-        s.setblocking(False)
         s.connect((ip, port))
         self.sock = s
 
@@ -31,8 +31,14 @@ class SolysConnection:
 
     def empty_recv(self):
         msg = "a"
+        self.sock.setblocking(False)
         while msg != None and len(msg) > 0:
-            msg = self.recv_msg()
+            try:
+                msg = self.recv_msg()
+                time.sleep(0.1)
+            except:
+                break
+        self.sock.setblocking(True)
 
     def close(self) -> None:
         self.sock.close()

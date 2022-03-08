@@ -4,6 +4,7 @@ import time
 from typing import List, Tuple
 
 from solys2moon import solys2moon as s2m
+import solys2moon
 
 TCP_IP = "157.88.43.171"
 TCP_PORT = 15000
@@ -22,7 +23,14 @@ def read_output(s: str, cmd: str) -> Tuple[List[float], 'OutCode']:
         unwateted = re.sub('(\d|\.|\ )', '', temp)
         only_nums = re.sub(unwateted, '', temp)
         if len(only_nums) > 0:
-            numbers = list(map(float, only_nums.split()))
+            only_nums_split = only_nums.split()
+            isdecimal = all(s.isdecimal() for s in only_nums_split)
+            if isdecimal:
+                numbers = list(map(float, only_nums_split))
+            else:
+                numbers = [1]
+        else:
+            numbers = [1]
     else:
         out_code = OutCode.NONE
         if rstrip.startswith("NO"):
@@ -42,7 +50,7 @@ def send_command(s: s2m.connection.SolysConnection, cmd: str):
         nums, out = read_output(resp, cmd)
         print("Respuesta: {}".format(resp))
 
-def main():
+def pruebas_comandos_raw():
     print("e")
     cmd_pwd = "PW solys"
     cmd_prot = "PR 0"
@@ -51,9 +59,15 @@ def main():
     send_command(s, cmd_pwd)
     send_command(s, cmd_prot)    
     send_command(s, cmd) 
-    send_command(s, "MS")
+    send_command(s, "VE")
     #send_command("PO 1 40")
     s.close()
+
+def main():
+    solys = s2m.Solys2(TCP_IP, TCP_PORT, "solys")
+    solys.set_azimuth(7)
+    solys.set_zenith(40)
+    solys.connection.close()
 
 if __name__ == "__main__":
     main()
