@@ -23,8 +23,33 @@ ERROR_CODES = {
     'Z': 'illegal internal firmware state.',
     'Q': 'Command is protected  password.',
     'R': 'Unknown command, or unidentified error.',
-    'P': 'Wrong password.'
+    'P': 'Wrong password.',
+    '10': 'Recursion Error. The solys returns error G although the password is accepted.'
 }
+
+class ErrorCode(Enum):
+    E1 = '1'
+    E2 = '2'
+    E3 = '3'
+    E4 = '4'
+    E5 = '5'
+    E6 = '6'
+    E7 = '7'
+    E8 = '8'
+    E9 = '9'
+    A = 'A'
+    B = 'B'
+    C = 'C'
+    D = 'D'
+    E = 'E'
+    F = 'F'
+    G = 'G'
+    Y = 'Y'
+    Z = 'Z'
+    Q = 'Q'
+    R = 'R'
+    P = 'P'
+    E10 = '10'
 
 class OutCode(Enum):
     """
@@ -66,14 +91,13 @@ def process_response(s: str, cmd: str) -> Tuple[List[float], OutCode, Union[str,
     if rstrip.startswith(cmd[:2]):
         # If the response starts with the command, it is answering that command
         temp = re.sub(cmd, '', rstrip)
-        unwateted = re.sub('(\d|\.|\ )', '', temp)
+        unwateted = re.sub('(\d|\.|\ |\-)', '', temp)
         only_nums = re.sub(unwateted, '', temp)
         if len(only_nums) > 0:
             only_nums_split = only_nums.split()
-            isdecimal = all(s.isdecimal() for s in only_nums_split)
-            if isdecimal:
+            try:
                 numbers = list(map(float, only_nums_split))
-            else:
+            except ValueError:
                 numbers = [1]
         else:
             numbers = [1]

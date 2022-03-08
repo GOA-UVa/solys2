@@ -4,7 +4,6 @@ import time
 from typing import List, Tuple
 
 from solys2moon import solys2moon as s2m
-import solys2moon
 
 TCP_IP = "157.88.43.171"
 TCP_PORT = 15000
@@ -65,8 +64,10 @@ def pruebas_comandos_raw():
 
 def main():
     solys = s2m.Solys2(TCP_IP, TCP_PORT, "solys")
-    solys.set_azimuth(7)
-    solys.set_zenith(40)
+    az, ze, _ = solys.get_planned_position()
+    print(az, ze)
+    solys.set_azimuth(0)
+    solys.set_zenith(0)
     solys.connection.close()
 
 if __name__ == "__main__":
