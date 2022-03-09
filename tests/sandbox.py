@@ -35,7 +35,7 @@ def read_output(s: str, cmd: str) -> Tuple[List[float], 'OutCode']:
         if rstrip.startswith("NO"):
             out_code = OutCode.ERROR
             err_code = rstrip.split()[1]
-            print("ERROR {}: {}".format(err_code, s2m.ERROR_CODES[err_code]))
+            print("ERROR {}: {}".format(err_code, s2m.translate_error(err_code)))
     return numbers, out_code
 
 def send_command(s: s2m.connection.SolysConnection, cmd: str):
@@ -50,16 +50,15 @@ def send_command(s: s2m.connection.SolysConnection, cmd: str):
         print("Respuesta: {}".format(resp))
 
 def pruebas_comandos_raw():
-    print("e")
+    s = s2m.connection.SolysConnection(TCP_IP, TCP_PORT)
     cmd_pwd = "PW solys"
     cmd_prot = "PR 0"
     cmd = "PO"
-    s = s2m.connection.SolysConnection(TCP_IP, TCP_PORT)
     send_command(s, cmd_pwd)
     send_command(s, cmd_prot)    
     send_command(s, cmd) 
     send_command(s, "VE")
-    #send_command("PO 1 40")
+    #send_command(s, "PO 1 40")
     s.close()
 
 def main():

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Union, Tuple, List
+from typing import Any, Union, Tuple, List
 import time
 
 from . import response
@@ -291,6 +291,50 @@ class Solys2:
         """
         output = self.send_command("LL")
         return output.nums[0], output.nums[1], output.nums[2], output
+
+    def set_power_save(self, save: bool) -> CommandOutput:
+        """Power Save (PS)
+
+        Parameters
+        ----------
+        save : bool
+            True if power save activated, false if not.
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("PS "+str(int(save)))
+        return output
+    
+    def get_power_save(self) -> Tuple[bool, CommandOutput]:
+        """Power Save (PS)
+
+        Returns
+        -------
+        power_save_status : int
+            1 if its activated, 0 if not, -1 if error.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("PS") 
+        return bool(output.nums[0]), output
+    
+    def get_sun_quadrants(self) -> Tuple[Any, CommandOutput]:
+        """Sun sensor scaling (SC)
+        Retrieve the scaling factor for each sun sensor quadrant along with the nominal
+        scaling of the sensor.
+
+        Returns
+        -------
+        quad_data : Any
+            Any
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("SC")
+        return None, output
 
 def translate_error(code: str) -> str:
     """
