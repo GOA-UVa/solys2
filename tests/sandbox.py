@@ -3,7 +3,7 @@ import re
 import time
 from typing import List, Tuple
 
-from solys2moon import solys2moon as s2m
+from solys2moon import solys2 as s2
 
 TCP_IP = "157.88.43.171"
 TCP_PORT = 15000
@@ -35,10 +35,10 @@ def read_output(s: str, cmd: str) -> Tuple[List[float], 'OutCode']:
         if rstrip.startswith("NO"):
             out_code = OutCode.ERROR
             err_code = rstrip.split()[1]
-            print("ERROR {}: {}".format(err_code, s2m.translate_error(err_code)))
+            print("ERROR {}: {}".format(err_code, s2.translate_error(err_code)))
     return numbers, out_code
 
-def send_command(s: s2m.connection.SolysConnection, cmd: str):
+def send_command(s: s2.connection.SolysConnection, cmd: str):
     resp = s.send_cmd(cmd)
     print(cmd)
     print("Respuesta: {}".format(resp))
@@ -50,7 +50,7 @@ def send_command(s: s2m.connection.SolysConnection, cmd: str):
         print("Respuesta: {}".format(resp))
 
 def pruebas_comandos_raw():
-    s = s2m.connection.SolysConnection(TCP_IP, TCP_PORT)
+    s = s2.connection.SolysConnection(TCP_IP, TCP_PORT)
     cmd_pwd = "PW solys"
     cmd_prot = "PR 0"
     cmd = "PO"
@@ -62,7 +62,7 @@ def pruebas_comandos_raw():
     s.close()
 
 def main():
-    solys = s2m.Solys2(TCP_IP, TCP_PORT, "solys")
+    solys = s2.Solys2(TCP_IP, TCP_PORT, "solys")
     az, ze, _ = solys.get_planned_position()
     print(az, ze)
     solys.set_azimuth(0)
