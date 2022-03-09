@@ -18,7 +18,7 @@ class CommandOutput:
     raw_response: str
     nums: List[float]
     out: response.OutCode
-    err: Tuple[str, None]
+    err: Union[str, None]
 
 class Solys2:
     def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
