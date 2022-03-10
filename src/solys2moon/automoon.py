@@ -3,12 +3,48 @@ import time
 import sys
 import datetime
 
-import ephem
+import pylunar
 
 from . import response
 from . import solys2
 
-def track_moon(ip: str, port: int, seconds: float, password: str = "solys"):
+def _decdeg2dms(dd: float) -> Tuple[int, int, int]:
+    """
+    Converts decimal degrees to degree, minute, second
+
+    Parameters
+    ----------
+    dd : float
+        Value to be transformed from decimal degrees.
+    
+    Returns
+    -------
+    deg : int
+        Degrees.
+    mnt : int
+        Minutes.
+    sec : int
+        Seconds.
+    """
+    mnt, sec = divmod(dd * 3600, 60)
+    deg, mnt = divmod(mnt, 60)
+    return int(deg), int(mnt), int(sec)
+
+def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "solys"):
+    """
+    Track the moon
+
+    Parameters
+    ----------
+    ip : str
+        IP of the solys.
+    seconds : float
+        Amount of seconds waited between each change of position of zenith and azimuth.
+    port : int
+        Access port. By default 15000.
+    password : str
+        Ethernet user password. By default is "solys".
+    """
     solys = solys2.Solys2(ip, port, password)
     lat, lon, _, ll_com = solys.get_location_pressure()
     if ll_com.out != response.OutCode.ANSWERED:
@@ -17,17 +53,18 @@ def track_moon(ip: str, port: int, seconds: float, password: str = "solys"):
                 file=sys.stderr)
         else:
             print("ERROR obtaining coordinates. Unknown error.", file=sys.stderr)
-    home = ephem.Observer()
-    moon = ephem.Moon()
-    home.lat, home.lon = lat, lon
+    mi = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
     while True:
-        home.date = datetime.datetime.utctimetuple()
+        dt = datetime.datetime.utctimetuple()
         t0 = time.time()
-        moon.compute(home)
-        az = moon.az
-        ze = moon.ze
+        mi.update(dt)
+        az = mi.azimuth()
+        ze = 90-mi.altitude()
         solys.set_azimuth(az)
         solys.set_zenith(ze)
+        #qs, output = solys.get_sun_quadrants()
+        qs = "Not yet implemented."
+        print("Azimuth: {}. Zenith: {}. Quadrants: {}".format(az, ze, qs))
         tf = time.time()
         tdiff = tf - t0
         time.sleep(seconds - tdiff)
