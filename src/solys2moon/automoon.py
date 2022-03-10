@@ -72,7 +72,7 @@ def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "soly
             print("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
             print("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
         while True:
-            q0, q1 = solys.get_queue_status()
+            q0, q1, _ = solys.get_queue_status()
             queue = q0 + q1
             if queue == 0:
                 break
