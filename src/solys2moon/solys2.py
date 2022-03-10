@@ -8,17 +8,19 @@ from . import connection
 
 _MAX_RELOGIN_RECURSION = 3
 
-class TrackerMode(Enum):
-    SUN = 'SUN'
-    REMOTE = 'REMOTE'
-    CLOCK = 'CLOCK'
-
 @dataclass
 class CommandOutput:
     raw_response: str
     nums: List[float]
     out: response.OutCode
     err: Union[str, None]
+
+class SolysFunction(Enum):
+    NO_FUNCTION = 0
+    STANDARD_OPERATION = 1
+    STANDARD_OPERATION_REVERSE = 2
+    SUNTRACKING = 4
+    ACTIVE_TRACKING = 6
 
 class Solys2:
     def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
@@ -69,8 +71,8 @@ class Solys2:
         nums, out, err = response.process_response(str_out, cmd)
         while out == response.OutCode.NONE:
             time.sleep(0.1)
-            resp = self.connection.recv_msg()
-            nums, out, err = response.process_response(resp, cmd)
+            str_out = self.connection.recv_msg()
+            nums, out, err = response.process_response(str_out, cmd)
         if out == response.OutCode.ERROR and err == 'G':
             # Password issue, need to relogin
             recursion += 1
@@ -144,16 +146,18 @@ class Solys2:
         """
         cmd = 'AD'
         output = self.send_command(cmd)
+        if output.out != response.OutCode.ANSWERED:
+            return 0, 0, output
         self.offset_cp = output.nums
         return output.nums[0], output.nums[1], output
 
-    def adjust_motor_0(self, degrees: float):
+    def adjust_motor_0(self, degrees: float) -> CommandOutput:
         """Adjust motor 0 (AD 0)
         
         Cause the physical <motor> position to be <relative position> further clockwise while the
         logical position remains the same. The sum of all adjustments is called the total
         adjustment. The parameter <relative position> must be within acceptable limits
-        (-0.21� and +0.21�) and must not cause the total adjustment to exceed 4�.
+        (-0.21º and +0.21º) and must not cause the total adjustment to exceed 4º.
         This command is only permitted after protection has been removed with the PWord command.
 
         Parameters
@@ -163,10 +167,11 @@ class Solys2:
         """
         cmd = 'AD 0 {}'.format(degrees)
         output = self.send_command(cmd)
-        self.adjust()
+        if output.out == response.OutCode.ANSWERED:
+            self.adjust()
         return output
 
-    def adjust_motor_1(self, degrees: float):
+    def adjust_motor_1(self, degrees: float) -> CommandOutput:
         """Adjust motor 1 (AD 1)
         
         Cause the physical <motor> position to be <relative position> further clockwise while the
@@ -182,7 +187,8 @@ class Solys2:
         """
         cmd = 'AD 1 {}'.format(degrees)
         output = self.send_command(cmd)
-        self.adjust()
+        if output.out == response.OutCode.ANSWERED:
+            self.adjust()
         return output
 
     def version(self) -> CommandOutput:
@@ -198,8 +204,8 @@ class Solys2:
         output = self.send_command(cmd)
         return output
     
-    def reset(self) -> CommandOutput:
-        """Reset/Home (HO)
+    def home(self) -> CommandOutput:
+        """Home (HO)
         Tells the Solys to go to its home position. (it will stay there for over 1 minute).
         This might block the Solys for a couple of minutes.
 
@@ -272,8 +278,28 @@ class Solys2:
             Output of the command, data received from solys.
         """
         output = self.send_command("PO")
+        if output.out != response.OutCode.ANSWERED:
+            return 0, 0, output
         return output.nums[0], output.nums[1], output
     
+    def get_current_position(self) -> Tuple[int, int, CommandOutput]:
+        """Current Position (CP)
+        Obtain the positions where the Solys is at the moment.
+        
+        Returns
+        -------
+        azimuth : float
+            Azimuth angle at which the Solys is pointing.
+        zenith : float
+            Zenith angle at which the Solys is pointing.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("CP")
+        if output.out != response.OutCode.ANSWERED:
+            return 0, 0, output
+        return output.nums[0], output.nums[1], output
+
     def get_location_pressure(self) -> Tuple[float, float, float, CommandOutput]:
         """Location and pressure (LL)
         Obtain the location and pressure for the site.
@@ -290,6 +316,8 @@ class Solys2:
             Output of the command, data received from solys.
         """
         output = self.send_command("LL")
+        if output.out != response.OutCode.ANSWERED:
+            return 0, 0, 0, output
         return output.nums[0], output.nums[1], output.nums[2], output
 
     def set_power_save(self, save: bool) -> CommandOutput:
@@ -321,20 +349,82 @@ class Solys2:
         output = self.send_command("PS") 
         return bool(output.nums[0]), output
     
-    def get_sun_quadrants(self) -> Tuple[Any, CommandOutput]:
-        """Sun sensor scaling (SC)
-        Retrieve the scaling factor for each sun sensor quadrant along with the nominal
-        scaling of the sensor.
-
+    def get_queue_status(self) -> Tuple[int, int, CommandOutput]:
+        """Queue Status (QS)
+        Retrieves the current number of path segments in the path for each motor.
+        
         Returns
         -------
-        quad_data : Any
-            Any
+        count_0 : int
+            Queue status of the first motor. Azimuth/Horizontal motor.
+        count_1 : int
+            Queue status of the second motor. Zenith/Vertical motor.
         output : CommandOutput
             Output of the command, data received from solys.
         """
-        output = self.send_command("SC")
-        return None, output
+        output = self.send_command("QS")
+        if output.out != response.OutCode.ANSWERED:
+            return -1, -1, output
+        nums, out, err = response.process_response(output.raw_response, "QS", True)
+        output = CommandOutput(output.raw_response, nums, out, err)
+        return nums[0], nums[1], output
+
+    def get_function(self) -> Tuple[SolysFunction, CommandOutput]:
+        """Get Function (FU)
+        Retrieve the code indicating the function for which the tracker is being used.
+
+        Returns
+        -------
+        function : SolysFunction
+            Function for which the tracker is being used. NO_FUNCTION in case of error.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("FU")
+        if output.out != response.OutCode.ANSWERED:
+            return SolysFunction.NO_FUNCTION, output
+        return SolysFunction(int(output.nums[0])), output
+
+    def set_function(self, func: SolysFunction) -> CommandOutput:
+        """Set Function (FU)
+        Sets the function of the tracker.
+        
+        Note: If the instrument was suntracking and is given a non-suntracking function,
+        it will continue to follow the sun until it's sent a home (HO) command.
+
+        Parameters
+        ----------
+        func : SolysFunction
+            Function for which the tracker will be used for.
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("FU {}".format(func.value))
+        return output
+
+    def get_sun_intensity(self) -> Tuple[List[float], float, CommandOutput]:
+        """Sun intensity (SI)
+        Retrieves the current sun intensity.
+
+        Returns
+        -------
+        intensities : list of 4 float
+            Intensity of each quadrant. [Q1, Q2, Q3, Q4]
+        total_intensity : float
+            Total intensity.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("SI")
+        intensities = []
+        total_intensity = 0
+        if output.out == response.OutCode.ANSWERED:
+            intensities = output.nums[:4]
+            total_intensity = output.nums[4]
+        return intensities, total_intensity, output
 
 def translate_error(code: str) -> str:
     """

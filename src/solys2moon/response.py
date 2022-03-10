@@ -1,3 +1,4 @@
+from email.mime import base
 from enum import Enum
 import re
 from typing import Union, Tuple, List
@@ -63,7 +64,10 @@ class OutCode(Enum):
     ERROR = 0
     ANSWERED = 1
 
-def process_response(s: str, cmd: str) -> Tuple[List[float], OutCode, Union[str, None]]:
+def _float_hex(value: str) -> float:
+    return float(value, base=16)
+
+def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[float], OutCode, Union[str, None]]:
     """
     Process the response given by the Solys2
 
@@ -73,6 +77,8 @@ def process_response(s: str, cmd: str) -> Tuple[List[float], OutCode, Union[str,
         Response given by the Solys2
     cmd : str
         Command sent to the Solys2
+    hex_nums : bool
+        The numbers are converted from hex strings instead of decimal strings if True.
 
     Returns
     -------
@@ -96,7 +102,10 @@ def process_response(s: str, cmd: str) -> Tuple[List[float], OutCode, Union[str,
         if len(only_nums) > 0:
             only_nums_split = only_nums.split()
             try:
-                numbers = list(map(float, only_nums_split))
+                if hex_nums:
+                    numbers = list(map(_float_hex, only_nums_split))
+                else:
+                    numbers = list(map(float, only_nums_split))
             except ValueError:
                 numbers = [1]
         else:

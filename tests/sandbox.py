@@ -67,6 +67,7 @@ def main():
     print(az, ze)
     solys.set_azimuth(0)
     solys.set_zenith(0)
+    print(solys.get_sun_quadrants())
     solys.connection.close()
 
 if __name__ == "__main__":

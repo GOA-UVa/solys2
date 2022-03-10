@@ -55,16 +55,17 @@ def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "soly
             print("ERROR obtaining coordinates. Unknown error.", file=sys.stderr)
     mi = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
     while True:
-        dt = datetime.datetime.utctimetuple()
+        dt = datetime.datetime.utcnow()
         t0 = time.time()
         mi.update(dt)
         az = mi.azimuth()
         ze = 90-mi.altitude()
         solys.set_azimuth(az)
         solys.set_zenith(ze)
-        #qs, output = solys.get_sun_quadrants()
-        qs = "Not yet implemented."
-        print("Azimuth: {}. Zenith: {}. Quadrants: {}".format(az, ze, qs))
+        qsi, intens, output = solys.get_sun_intensity()
+        print("Azimuth: {}. Zenith: {}. Quadrants: {}".format(az, ze, qsi))
         tf = time.time()
         tdiff = tf - t0
-        time.sleep(seconds - tdiff)
+        sleep_time = seconds - tdiff
+        if sleep_time > 0:
+            time.sleep(sleep_time)
