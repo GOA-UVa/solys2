@@ -4,6 +4,7 @@ import time
 from typing import List, Tuple
 
 from solys2moon import solys2 as s2
+from solys2moon import automoon as aum
 
 TCP_IP = "157.88.43.171"
 TCP_PORT = 15000
@@ -62,13 +63,7 @@ def pruebas_comandos_raw():
     s.close()
 
 def main():
-    solys = s2.Solys2(TCP_IP, TCP_PORT, "solys")
-    az, ze, _ = solys.get_planned_position()
-    print(az, ze)
-    solys.set_azimuth(0)
-    solys.set_zenith(0)
-    print(solys.get_sun_quadrants())
-    solys.connection.close()
+    aum.track_moon(TCP_IP, 30, TCP_PORT, "solys", True)
 
 if __name__ == "__main__":
     main()
