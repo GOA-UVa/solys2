@@ -30,7 +30,7 @@ def _decdeg2dms(dd: float) -> Tuple[int, int, int]:
     deg, mnt = divmod(mnt, 60)
     return int(deg), int(mnt), int(sec)
 
-def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "solys"):
+def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "solys", log: bool = False):
     """
     Track the moon
 
@@ -44,6 +44,8 @@ def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "soly
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
+    log : bool
+        True if some logging is required. Otherwise silent. Default is silent.
     """
     solys = solys2.Solys2(ip, port, password)
     lat, lon, _, ll_com = solys.get_location_pressure()
@@ -60,10 +62,23 @@ def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "soly
         mi.update(dt)
         az = mi.azimuth()
         ze = 90-mi.altitude()
+        prev_az, prev_ze, _ = solys.get_current_position()
+        qsi, total_intens, _ = solys.get_sun_intensity()
         solys.set_azimuth(az)
         solys.set_zenith(ze)
-        qsi, intens, output = solys.get_sun_intensity()
-        print("Azimuth: {}. Zenith: {}. Quadrants: {}".format(az, ze, qsi))
+        if log:
+            print("Datetime: {}".format(dt))
+            print("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
+            print("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
+            print("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
+        while True:
+            q0, q1 = solys.get_queue_status()
+            queue = q0 + q1
+            if queue == 0:
+                break
+            if log: print("Queue size {}. Sleeping 1 sec...".format(queue))
+            time.sleep(1)
+        
         tf = time.time()
         tdiff = tf - t0
         sleep_time = seconds - tdiff
