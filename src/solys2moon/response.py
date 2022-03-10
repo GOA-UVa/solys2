@@ -64,8 +64,8 @@ class OutCode(Enum):
     ERROR = 0
     ANSWERED = 1
 
-def _float_hex(value: str) -> float:
-    return float(value, base=16)
+def _int_hex(value: str) -> int:
+    return int(value, base=16)
 
 def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[float], OutCode, Union[str, None]]:
     """
@@ -103,7 +103,7 @@ def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[flo
             only_nums_split = only_nums.split()
             try:
                 if hex_nums:
-                    numbers = list(map(_float_hex, only_nums_split))
+                    numbers = list(map(_int_hex, only_nums_split))
                 else:
                     numbers = list(map(float, only_nums_split))
             except ValueError:
