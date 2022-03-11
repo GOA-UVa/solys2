@@ -62,7 +62,7 @@ def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "soly
     mi = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
     if log: print("Tracking sun. Connected with Solys2.")
     while True:
-        dt = datetime.datetime.utcnow()
+        dt = datetime.datetime.now(datetime.timezone.utc)
         t0 = time.time()
         mi.update(dt)
         az = mi.azimuth()
@@ -122,7 +122,7 @@ def track_sun(ip: str, seconds: float, port: int = 15000, password: str = "solys
             print("ERROR obtaining coordinates. Unknown error.", file=sys.stderr)
     if log: print("Tracking sun. Connected with Solys2.")
     while True:
-        dt = datetime.datetime.utcnow()
+        dt = datetime.datetime.now(datetime.timezone.utc)
         t0 = time.time()
         az = solar.get_azimuth(lat, lon, dt)
         ze = 90-solar.get_altitude(lat, lon, dt)

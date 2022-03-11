@@ -65,7 +65,7 @@ def pruebas_comandos_raw():
     s.close()
 
 def main():
-    aut.track_moon(TCP_IP, 30, TCP_PORT, "solys", True)
+    aut.track_sun(TCP_IP, 30, TCP_PORT, "solys", True)
 
 if __name__ == "__main__":
     main()
