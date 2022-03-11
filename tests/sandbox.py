@@ -6,7 +6,7 @@ import time
 from typing import List, Tuple
 
 from solys2moon import solys2 as s2
-from solys2moon import automoon as aum
+from solys2moon import autotrack as aut
 
 TCP_IP = "157.88.43.171"
 TCP_PORT = 15000
@@ -58,14 +58,14 @@ def pruebas_comandos_raw():
     cmd_prot = "PR 0"
     cmd = "PO"
     send_command(s, cmd_pwd)
-    send_command(s, cmd_prot)    
-    send_command(s, cmd) 
+    send_command(s, cmd_prot)
+    send_command(s, cmd)
     send_command(s, "VE")
     #send_command(s, "PO 1 40")
     s.close()
 
 def main():
-    aum.track_moon(TCP_IP, 30, TCP_PORT, "solys", True)
+    aut.track_moon(TCP_IP, 30, TCP_PORT, "solys", True)
 
 if __name__ == "__main__":
     main()
