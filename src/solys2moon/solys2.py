@@ -8,6 +8,8 @@ from . import connection
 
 _MAX_RELOGIN_RECURSION = 3
 
+_DEFAULT_VAL_ERR = -999
+
 @dataclass
 class CommandOutput:
     raw_response: str
@@ -22,8 +24,34 @@ class SolysFunction(Enum):
     SUNTRACKING = 4
     ACTIVE_TRACKING = 6
 
+class SolysException(Exception):
+    pass
+
+def _create_solys_exception(error_code: str, raw_response: str = None) -> SolysException:
+    err = error_code
+    err_msg = translate_error(err)
+    sec_msg = ""
+    if raw_response != None:
+        sec_msg = "\nRaw response: {}.".format(raw_response)
+    return SolysException("ERROR {}: {}.{}".format(err, err_msg, sec_msg))
+
 class Solys2:
     def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the Solys2
+        port : int
+            Connection port of the Solys2
+        password : str
+            User password for the Solys2
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+        """
         self.ip = ip
         self.port = port
         self.password = password
@@ -47,7 +75,8 @@ class Solys2:
 
     def send_command(self, cmd: str, recursion: int = 0) -> CommandOutput:
         """
-        Send command to the solys.
+        Send command to the solys. If it gets deauthenticated, it authenticates again
+        automatically.
 
         Parameters
         ----------
@@ -59,31 +88,44 @@ class Solys2:
             in case it goes down, which it does. At some point it will stop
             recursing.
 
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
         Returns
         -------
         output : CommandOutput
             Output of the command, data received from solys.
         """
+        cmd = cmd.strip()
         if recursion >= _MAX_RELOGIN_RECURSION:
-            return CommandOutput("", [], response.OutCode.ERROR, response.ErrorCode.E10)
+            err = response.ErrorCode.E10.value
+            raise _create_solys_exception(err)
         self.connection.empty_recv()
         str_out = self.connection.send_cmd(cmd)
         nums, out, err = response.process_response(str_out, cmd)
         while out == response.OutCode.NONE:
+            # The solys might return empty responses (or older responses) until it answers
+            # the command.
             time.sleep(0.1)
             str_out = self.connection.recv_msg()
             nums, out, err = response.process_response(str_out, cmd)
-        if out == response.OutCode.ERROR and err == 'G':
-            # Password issue, need to relogin
-            recursion += 1
-            _, _, out_pass, err = self.send_password(recursion)
-            if out_pass != response.OutCode.ERROR:
-                _, _, out_prot, err = self.lift_protection(recursion)
-                if out_prot != response.OutCode.ERROR:
-                    self.send_command(cmd, recursion)
+        if out == response.OutCode.ERROR:
+            if err == 'G':
+                if cmd.startswith("PW"):
+                    raise _create_solys_exception(err, str_out)
+                else:
+                    # Password issue, need to relogin
+                    recursion += 1
+                    self.send_password(recursion)
+                    self.lift_protection(recursion)
+                    return self.send_command(cmd, recursion)
+            else:
+                # Any other kind of error
+                raise _create_solys_exception(err, str_out)
         if err == None:
             err = ""
-        
         return CommandOutput(str_out, nums, out, err)
 
     def send_password(self, recursion: int = 0) -> CommandOutput:
@@ -98,6 +140,11 @@ class Solys2:
             This recursion is due to the need to try to lift the protection
             in case it goes down, which it does. At some point it will stop
             recursing.
+        
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Returns
         -------
@@ -121,6 +168,11 @@ class Solys2:
             in case it goes down, which it does. At some point it will stop
             recursing.
 
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
         Returns
         -------
         output : CommandOutput
@@ -135,6 +187,11 @@ class Solys2:
         Retrieve the tracking adjustment for all motors. Returns AD <adjustment 0> <adjustment 1>.
         Adjustments are reported in degrees.
 
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
         Returns
         -------
         adjustment_0 : float
@@ -146,8 +203,9 @@ class Solys2:
         """
         cmd = 'AD'
         output = self.send_command(cmd)
-        if output.out != response.OutCode.ANSWERED:
-            return 0, 0, output
+        req_nums_len = 2
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
+            return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         self.offset_cp = output.nums
         return output.nums[0], output.nums[1], output
 
@@ -159,6 +217,11 @@ class Solys2:
         adjustment. The parameter <relative position> must be within acceptable limits
         (-0.21º and +0.21º) and must not cause the total adjustment to exceed 4º.
         This command is only permitted after protection has been removed with the PWord command.
+        
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Parameters
         ----------
@@ -167,7 +230,8 @@ class Solys2:
         """
         cmd = 'AD 0 {}'.format(degrees)
         output = self.send_command(cmd)
-        if output.out == response.OutCode.ANSWERED:
+        if output.out == response.OutCode.ANSWERED or output.out == response.OutCode.ANSWERED_NO_NUMS or \
+                output.out == response.OutCode.ANSWERED_VALUE_ERROR:
             self.adjust()
         return output
 
@@ -177,8 +241,13 @@ class Solys2:
         Cause the physical <motor> position to be <relative position> further clockwise while the
         logical position remains the same. The sum of all adjustments is called the total
         adjustment. The parameter <relative position> must be within acceptable limits
-        (-0.21� and +0.21�) and must not cause the total adjustment to exceed 4�.
+        (-0.21º and +0.21º) and must not cause the total adjustment to exceed 4º.
         This command is only permitted after protection has been removed with the PWord command.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Parameters
         ----------
@@ -187,13 +256,19 @@ class Solys2:
         """
         cmd = 'AD 1 {}'.format(degrees)
         output = self.send_command(cmd)
-        if output.out == response.OutCode.ANSWERED:
+        if output.out == response.OutCode.ANSWERED or output.out == response.OutCode.ANSWERED_NO_NUMS or \
+                output.out == response.OutCode.ANSWERED_VALUE_ERROR:
             self.adjust()
         return output
 
     def version(self) -> CommandOutput:
         """Version (VE)
         Obtain the version of the solys.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Returns
         -------
@@ -208,6 +283,11 @@ class Solys2:
         """Home (HO)
         Tells the Solys to go to its home position. (it will stay there for over 1 minute).
         This might block the Solys for a couple of minutes.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Returns
         -------
@@ -229,6 +309,11 @@ class Solys2:
         """Position 0 (PO 0)
         Set the azimuth angle at which the solys is pointing.
 
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
         Parameters
         ----------
         azimuth : float
@@ -246,6 +331,11 @@ class Solys2:
     def set_zenith(self, zenith: float) -> CommandOutput:
         """Position 1 (PO 1)
         Set the zenith angle at which the solys is pointing.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Parameters
         ----------
@@ -267,6 +357,11 @@ class Solys2:
     def get_planned_position(self) -> Tuple[int, int, CommandOutput]:
         """Position (PO)
         Obtain the positions that the Solys sais it's going to.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
         
         Returns
         -------
@@ -278,13 +373,19 @@ class Solys2:
             Output of the command, data received from solys.
         """
         output = self.send_command("PO")
-        if output.out != response.OutCode.ANSWERED:
-            return 0, 0, output
+        req_nums_len = 2
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
+            return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         return output.nums[0], output.nums[1], output
     
     def get_current_position(self) -> Tuple[int, int, CommandOutput]:
         """Current Position (CP)
         Obtain the positions where the Solys is at the moment.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
         
         Returns
         -------
@@ -296,13 +397,19 @@ class Solys2:
             Output of the command, data received from solys.
         """
         output = self.send_command("CP")
-        if output.out != response.OutCode.ANSWERED:
-            return 0, 0, output
+        req_nums_len = 2
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
+            return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         return output.nums[0], output.nums[1], output
 
     def get_location_pressure(self) -> Tuple[float, float, float, CommandOutput]:
         """Location and pressure (LL)
         Obtain the location and pressure for the site.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Returns
         -------
@@ -316,8 +423,9 @@ class Solys2:
             Output of the command, data received from solys.
         """
         output = self.send_command("LL")
-        if output.out != response.OutCode.ANSWERED:
-            return 0, 0, 0, output
+        req_nums_len = 3
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
+            return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         return output.nums[0], output.nums[1], output.nums[2], output
 
     def set_power_save(self, save: bool) -> CommandOutput:
@@ -327,6 +435,11 @@ class Solys2:
         ----------
         save : bool
             True if power save activated, false if not.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Returns
         -------
@@ -339,19 +452,32 @@ class Solys2:
     def get_power_save(self) -> Tuple[bool, CommandOutput]:
         """Power Save (PS)
 
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
         Returns
         -------
         power_save_status : int
-            1 if its activated, 0 if not, -1 if error.
+            1 if its activated, 0 if not, -1 if error (it should raise an exception).
         output : CommandOutput
             Output of the command, data received from solys.
         """
-        output = self.send_command("PS") 
+        output = self.send_command("PS")
+        req_nums_len = 1
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
+            return _DEFAULT_VAL_ERR, output
         return bool(output.nums[0]), output
     
     def get_queue_status(self) -> Tuple[int, int, CommandOutput]:
         """Queue Status (QS)
         Retrieves the current number of path segments in the path for each motor.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
         
         Returns
         -------
@@ -364,14 +490,22 @@ class Solys2:
         """
         output = self.send_command("QS")
         if output.out != response.OutCode.ANSWERED:
-            return -1, -1, output
+            return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         nums, out, err = response.process_response(output.raw_response, "QS", True)
         output = CommandOutput(output.raw_response, nums, out, err)
+        req_nums_len = 2
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
+            return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         return nums[0], nums[1], output
 
     def get_function(self) -> Tuple[SolysFunction, CommandOutput]:
         """Get Function (FU)
         Retrieve the code indicating the function for which the tracker is being used.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Returns
         -------
@@ -381,7 +515,8 @@ class Solys2:
             Output of the command, data received from solys.
         """
         output = self.send_command("FU")
-        if output.out != response.OutCode.ANSWERED:
+        req_nums_len = 1
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
             return SolysFunction.NO_FUNCTION, output
         return SolysFunction(int(output.nums[0])), output
 
@@ -397,6 +532,11 @@ class Solys2:
         func : SolysFunction
             Function for which the tracker will be used for.
 
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
         Returns
         -------
         output : CommandOutput
@@ -408,6 +548,11 @@ class Solys2:
     def get_sun_intensity(self) -> Tuple[List[float], float, CommandOutput]:
         """Sun intensity (SI)
         Retrieves the current sun intensity.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
 
         Returns
         -------
@@ -421,10 +566,82 @@ class Solys2:
         output = self.send_command("SI")
         intensities = []
         total_intensity = 0
-        if output.out == response.OutCode.ANSWERED:
-            intensities = output.nums[:4]
-            total_intensity = output.nums[4]
+        req_nums_len = 5
+        if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
+            return [_DEFAULT_VAL_ERR for _ in range(4)], _DEFAULT_VAL_ERR, output
+        intensities = output.nums[:4]
+        total_intensity = output.nums[4]
         return intensities, total_intensity, output
+    
+    def _set_function_with_home(self, func: SolysFunction) -> List[CommandOutput]:
+        """
+        Set a tracking function, send the home function and mantain the motor adjustment.
+
+        Parameters
+        ----------
+        func : SolysFunction
+            Function for which the tracker will be used for.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        outputs : list of CommandOutput
+            Output of the commands, data received from solys.
+        """
+        o0 = self.set_function(func)
+        o1 = self.home()
+        offset0 = self.offset_cp[0]
+        offset1 = self.offset_cp[1]
+        o2 = self.adjust_motor_0(offset0)
+        o3 = self.adjust_motor_1(offset1)
+        return [o0, o1, o2, o3]
+
+    def set_automatic(self) -> List[CommandOutput]:
+        """
+        Set the tracker in automatic active tracking following the sun.
+
+        Parameters
+        ----------
+        func : SolysFunction
+            Function for which the tracker will be used for.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        outputs : list of CommandOutput
+            Output of the commands, data received from solys.
+        """
+        return self._set_function_with_home(SolysFunction.ACTIVE_TRACKING)
+
+    def set_manual(self) -> List[CommandOutput]:
+        """
+        Set the tracker in manual standard operation mode.
+
+        Parameters
+        ----------
+        func : SolysFunction
+            Function for which the tracker will be used for.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        outputs : list of CommandOutput
+            Output of the commands, data received from solys.
+        """
+        return self._set_function_with_home(SolysFunction.STANDARD_OPERATION)
+
 
 def translate_error(code: str) -> str:
     """

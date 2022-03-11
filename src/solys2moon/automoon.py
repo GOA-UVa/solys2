@@ -8,6 +8,8 @@ import pylunar
 from . import response
 from . import solys2
 
+_TIME_DELAY = 0.001
+
 def _decdeg2dms(dd: float) -> Tuple[int, int, int]:
     """
     Converts decimal degrees to degree, minute, second
@@ -48,6 +50,7 @@ def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "soly
         True if some logging is required. Otherwise silent. Default is silent.
     """
     solys = solys2.Solys2(ip, port, password)
+    solys.set_power_save(False)
     lat, lon, _, ll_com = solys.get_location_pressure()
     if ll_com.out != response.OutCode.ANSWERED:
         if ll_com.err != None:
@@ -62,25 +65,29 @@ def track_moon(ip: str, seconds: float, port: int = 15000, password: str = "soly
         mi.update(dt)
         az = mi.azimuth()
         ze = 90-mi.altitude()
-        prev_az, prev_ze, _ = solys.get_current_position()
-        qsi, total_intens, _ = solys.get_sun_intensity()
-        solys.set_azimuth(az)
-        solys.set_zenith(ze)
-        if log:
-            print("Datetime: {}".format(dt))
-            print("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
-            print("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-            print("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
-        while True:
-            q0, q1, _ = solys.get_queue_status()
-            queue = q0 + q1
-            if queue == 0:
-                break
-            if log: print("Queue size {}. Sleeping 1 sec...".format(queue))
-            time.sleep(1)
-        
+        try:
+            prev_az, prev_ze, _ = solys.get_current_position()
+            qsi, total_intens, _ = solys.get_sun_intensity()
+            solys.set_azimuth(az)
+            solys.set_zenith(ze)
+            if log:
+                print("Datetime: {}".format(dt))
+                print("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
+                print("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
+                print("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
+                print()
+            while True:
+                q0, q1, _ = solys.get_queue_status()
+                queue = q0 + q1
+                if queue == 0:
+                    break
+                if log: print("Queue size {}. Sleeping 1 sec...".format(queue))
+                time.sleep(1)
+        except solys2.SolysException as e:
+            print("Error at datetime: {}".format(dt), file=sys.stderr)
+            print(e, file=sys.stderr)
         tf = time.time()
         tdiff = tf - t0
-        sleep_time = seconds - tdiff
+        sleep_time = (seconds - tdiff) - _TIME_DELAY
         if sleep_time > 0:
             time.sleep(sleep_time)

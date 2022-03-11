@@ -58,11 +58,16 @@ class OutCode(Enum):
 
     NONE: Empty message, or a response that is not for the sent command.
     ERROR: An error was encountered-
-    ANSWERED: The response was a successfull answer for the command.
+    ANSWERED: The response was a successful answer for the command.
+    ANSWERED_NO_NUMS: The response was a successful answer but it didn't contain numbers.
+    ANSWERED_VALUE_ERROR: The response was a successful answer but there was an error converting
+        the numbers from strings.
     """
     NONE = -1
     ERROR = 0
     ANSWERED = 1
+    ANSWERED_NO_NUMS = 2
+    ANSWERED_VALUE_ERROR = 3
 
 def _int_hex(value: str) -> int:
     return int(value, base=16)
@@ -108,8 +113,10 @@ def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[flo
                     numbers = list(map(float, only_nums_split))
             except ValueError:
                 numbers = [1]
+                out_code = OutCode.ANSWERED_VALUE_ERROR
         else:
             numbers = [1]
+            out_code = OutCode.ANSWERED_NO_NUMS
     elif rstrip.startswith("NO"):
         # If the response starts with "NO", there was an error
         out_code = OutCode.ERROR
