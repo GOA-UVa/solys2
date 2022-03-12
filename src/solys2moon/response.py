@@ -14,9 +14,23 @@ It exports the following functions:
     * process_response : Process the response given by the Solys2.
 """
 
+"""___Built-In Modules___"""
 from enum import Enum
 import re
 from typing import Union, Tuple, List
+
+"""___Third-Party Modules___"""
+# import here
+
+"""___Solys2 Modules___"""
+# import here
+
+"""___Authorship___"""
+__author__ = "Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, and Ramiro González Catón"
+__created__ = "2022/03/09"
+__maintainer__ = "Javier Gatón Herguedas"
+__email__ = "gaton@goa.uva.es"
+__status__ = "Development"
 
 ERROR_CODES = {
     '1': 'framing error.',

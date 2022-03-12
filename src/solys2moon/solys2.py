@@ -14,13 +14,25 @@ It exports the following functions:
     * translate_error : Returns the error related to an error code.
 """
 
+"""___Built-In Modules___"""
 from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple, List
 import time
 
+"""___Third-Party Modules___"""
+# import here
+
+"""___Solys2 Modules___"""
 from . import response
 from . import connection
+
+"""___Authorship___"""
+__author__ = "Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, and Ramiro González Catón"
+__created__ = "2022/03/09"
+__maintainer__ = "Javier Gatón Herguedas"
+__email__ = "gaton@goa.uva.es"
+__status__ = "Development"
 
 _MAX_RELOGIN_RECURSION = 3
 

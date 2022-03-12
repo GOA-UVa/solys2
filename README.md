@@ -1,7 +1,7 @@
 # solys2moon
 
-Python package for connecting with Solys 2 and setting it up to automatically track the moon
-or the sun.
+Python package for connecting and communicating with the Solys 2 and setting it up
+to automatically track the moon or the sun.
 
 ## Requirements
 

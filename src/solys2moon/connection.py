@@ -8,8 +8,22 @@ It exports the following classes:
         from the Solys2.
 """
 
+"""___Built-In Modules___"""
 import socket
 import time
+
+"""___Third-Party Modules___"""
+# import here
+
+"""___Solys2 Modules___"""
+# import here
+
+"""___Authorship___"""
+__author__ = "Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, and Ramiro González Catón"
+__created__ = "2022/03/09"
+__maintainer__ = "Javier Gatón Herguedas"
+__email__ = "gaton@goa.uva.es"
+__status__ = "Development"
 
 _RECV_BUFFER_SIZE = 1024
 _SECS_TIMEOUT = 10

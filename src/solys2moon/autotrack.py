@@ -1,3 +1,15 @@
+"""AutoTrack
+
+Module that contains the functionalities of performing automatic actions with the Solys2.
+
+It exports the following classes:
+    * MoonTracker : Object that contains the thread that controls the Solys2 for tracking
+        automatically the Moon.
+    * SunTracker : Object that contains the thread that controls the Solys2 for tracking
+        automatically the Sun.
+"""
+
+"""___Built-In Modules___"""
 from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple, List
@@ -6,11 +18,20 @@ import datetime
 import logging
 from threading import Thread, Lock
 
+"""___Third-Party Modules___"""
 import pylunar
 from pysolar import solar
 
+"""___Solys2 Modules___"""
 from . import response
 from . import solys2
+
+"""___Authorship___"""
+__author__ = "Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, and Ramiro González Catón"
+__created__ = "2022/03/10"
+__maintainer__ = "Javier Gatón Herguedas"
+__email__ = "gaton@goa.uva.es"
+__status__ = "Development"
 
 def _decdeg2dms(dd: float) -> Tuple[int, int, int]:
     """
@@ -96,6 +117,10 @@ def _get_sun_position(coords: Tuple[float, float], dt: datetime.datetime) -> Tup
 
 @dataclass
 class _ContainedBool:
+    """
+    Dataclass that acts as a container of a boolean variable so it gets passed as a
+    reference.
+    """
     value : bool
 
 def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, cont_track : _ContainedBool,
@@ -133,8 +158,8 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, con
     """
     if log:
         logging.basicConfig(level=logging.DEBUG)
-        if logfile != "":
-            logging.basicConfig(filename=logfile, filemode='w')
+    if logfile != "":
+        logging.basicConfig(filename=logfile, filemode='w')
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
@@ -263,9 +288,41 @@ def _track_sun(ip: str, seconds: float, mutex_cont: Lock, cont_track : _Containe
         log, logfile)
 
 class _BodyTracker:
-    def __init__(self, ip: str, seconds: float, body: _TrackBody, port: int = 15000, password: str = "solys",
-        log: bool = False, logfile: str = ""):
-        """"""
+    """_BodyTracker
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it tracks the selected body.
+
+    Attributes
+    ----------
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
+    thread : Thread
+        Thread that will execute the tracking function.
+    """
+    def __init__(self, ip: str, seconds: float, body: _TrackBody, port: int = 15000,
+        password: str = "solys", log: bool = False, logfile: str = ""):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        seconds : float
+            Amount of seconds waited between each change of position of zenith and azimuth.
+        body : _TrackBody
+            Body that will be tracked. Moon or Sun.
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        log : bool
+            True if some logging is required. Otherwise silent. Default is silent.
+        logfile : str
+            Path of the file where the logging will be stored. In case that it's not used, it will be
+            printed in standard output error.
+        """
         self.mutex_cont = Lock()
         self.cont_track = _ContainedBool(True)
         self.thread = Thread(target = _track_body, args = (ip, seconds, body, self.mutex_cont,
@@ -273,18 +330,65 @@ class _BodyTracker:
         self.thread.start()
     
     def stop_tracking(self):
+        """
+        Stop the tracking of the tracked body. The connection with the Solys2 will be closed and
+        the thread stopped.
+
+        It won't be stopped immediately, at most there will be a delay of __init__ "seconds"
+        parameter.
+        """
         self.mutex_cont.acquire()
         self.cont_track.value = False
         self.mutex_cont.release()
 
 class MoonTracker(_BodyTracker):
+    """MoonTracker
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it tracks the Moon.
+    """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         log: bool = False, logfile: str = ""):
-        """"""
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        seconds : float
+            Amount of seconds waited between each change of position of zenith and azimuth.
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        log : bool
+            True if some logging is required. Otherwise silent. Default is silent.
+        logfile : str
+            Path of the file where the logging will be stored. In case that it's not used, it will be
+            printed in standard output error.
+        """
         super().__init__(ip, seconds, _TrackBody.MOON, port, password, log, logfile)
 
 class SunTracker(_BodyTracker):
+    """SunTracker
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it tracks the Sun.
+    """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         log: bool = False, logfile: str = ""):
-        """"""
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        seconds : float
+            Amount of seconds waited between each change of position of zenith and azimuth.
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        log : bool
+            True if some logging is required. Otherwise silent. Default is silent.
+        logfile : str
+            Path of the file where the logging will be stored. In case that it's not used, it will be
+            printed in standard output error.
+        """
         super().__init__(ip, seconds, _TrackBody.SUN, port, password, log, logfile)
