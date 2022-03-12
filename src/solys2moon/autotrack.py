@@ -172,7 +172,7 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, con
             logging.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
             logging.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
             logging.info("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
-            logging.info()
+            logging.info("")
             while True:
                 q0, q1, _ = solys.get_queue_status()
                 queue = q0 + q1
