@@ -162,7 +162,7 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, con
         mutex_cont.release()
         dt = datetime.datetime.now(datetime.timezone.utc)
         logging.debug("Waited {} seconds.".format(sleep_time))
-        az, ze = get_position(mi_coords, datetime)
+        az, ze = get_position(mi_coords, dt)
         try:
             prev_az, prev_ze, _ = solys.get_current_position()
             qsi, total_intens, _ = solys.get_sun_intensity()
