@@ -1,6 +1,22 @@
+"""Solys2
+
+Module that encapsulates and abstracts an interface for interacting with the Solys2.
+
+It exports the following classes:
+    * Solys2 : Class that encapsulates and abstracts the connection and interaction
+        with the Solys2.
+    * CommandOutput : Dataclass that stores the output of a Solys2 message somewhat processed.
+    * SolysFunction : Enum that stores the functions that the Solys2 can be set to with the
+        FU command.
+    * SolysException : Exception raised when there was an error with the Solys2.
+
+It exports the following functions:
+    * translate_error : Returns the error related to an error code.
+"""
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union, Tuple, List
+from typing import Tuple, List
 import time
 
 from . import response
@@ -12,12 +28,35 @@ _DEFAULT_VAL_ERR = -999
 
 @dataclass
 class CommandOutput:
+    """
+    Dataclass that stores the output of a Solys2 message somewhat processed.
+
+    Attributes
+    ----------
+    raw_response : str
+        Raw response TCP message received from the Solys2.
+    nums : list of float
+        Output numbers present in the raw_response, already filtered.
+    out : response.OutCode
+        Type of message received from the Solys.
+    err : str
+        Error code received from the Solys2. If none, it will be an empty str.
+    """
     raw_response: str
     nums: List[float]
     out: response.OutCode
-    err: Union[str, None]
+    err: str
 
 class SolysFunction(Enum):
+    """
+    Functions that the Solys2 can be set to with the FU command.
+
+    NO_FUNCTION : The tracker will not move.
+    STANDARD_OPERATION : The tracker moves in response to motion commands. Homes to (90,90).
+    STANDARD_OPERATION_REVERSE : The tracker moves in response to motion commands. Homes to (90,0).
+    SUNTRACKING : Following the sun.
+    ACTIVE_TRACKING : Following the sun using the sun sensor for minor adjustment.
+    """
     NO_FUNCTION = 0
     STANDARD_OPERATION = 1
     STANDARD_OPERATION_REVERSE = 2
@@ -25,9 +64,28 @@ class SolysFunction(Enum):
     ACTIVE_TRACKING = 6
 
 class SolysException(Exception):
+    """
+    Exception raised when there was an error in the communication with the Solys2, or the message
+    was unexpected.
+    """
     pass
 
 def _create_solys_exception(error_code: str, raw_response: str = None) -> SolysException:
+    """
+    Create a SolysException following a standarized format.
+
+    Parameters
+    ----------
+    error_code : str
+        Error code received from the Solys2.
+    raw_response : str
+        Raw response TCP message received from the Solys2.
+
+    Returns
+    -------
+    exc : SolysException
+        SolysException generated.
+    """
     err = error_code
     err_msg = translate_error(err)
     sec_msg = ""
@@ -36,16 +94,35 @@ def _create_solys_exception(error_code: str, raw_response: str = None) -> SolysE
     return SolysException("ERROR {}: {}.{}".format(err, err_msg, sec_msg))
 
 class Solys2:
+    """Solys2
+    Class that encapsulates and abstracts the connection and interaction with the Solys2
+
+    Attributes
+    ----------
+    ip : str
+        IP of the Solys2.
+    port : int
+        Connection port of the Solys2.
+    password : str
+        User password for the Solys2.
+    connection : connection.SolysConnection
+        Connection with the Solys2.
+    closed : bool
+        Boolean value that stores if the connection is closed or not.
+    offset_cp : list of float
+        Adjustments of the motors. [adjustment_0, adjustment_1].
+    """
+
     def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
         """
         Parameters
         ----------
         ip : str
-            IP of the Solys2
+            IP of the Solys2.
         port : int
-            Connection port of the Solys2
+            Connection port of the Solys2. Default is 15000.
         password : str
-            User password for the Solys2
+            User password for the Solys2. Default is "solys".
 
         Raises
         ------
@@ -140,7 +217,7 @@ class Solys2:
             This recursion is due to the need to try to lift the protection
             in case it goes down, which it does. At some point it will stop
             recursing.
-        
+
         Raises
         ------
         SolysException
@@ -186,6 +263,8 @@ class Solys2:
         """Adjust (AD)
         Retrieve the tracking adjustment for all motors. Returns AD <adjustment 0> <adjustment 1>.
         Adjustments are reported in degrees.
+
+        Also updates the inner variables that store the current adjustments.
 
         Raises
         ------
@@ -492,6 +571,8 @@ class Solys2:
         if output.out != response.OutCode.ANSWERED:
             return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         nums, out, err = response.process_response(output.raw_response, "QS", True)
+        if err == None:
+            err = ""
         output = CommandOutput(output.raw_response, nums, out, err)
         req_nums_len = 2
         if output.out != response.OutCode.ANSWERED or len(output.nums) < req_nums_len:
@@ -642,7 +723,6 @@ class Solys2:
         """
         return self._set_function_with_home(SolysFunction.STANDARD_OPERATION)
 
-
 def translate_error(code: str) -> str:
     """
     Returns the error related to the error code
@@ -660,5 +740,4 @@ def translate_error(code: str) -> str:
     str_code = str(code)
     if str_code in response.ERROR_CODES:
         return response.ERROR_CODES[str_code]
-    else:
-        return ""
+    return ""

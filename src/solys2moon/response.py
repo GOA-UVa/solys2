@@ -1,4 +1,19 @@
-from email.mime import base
+"""Response
+
+Module that contains functionalities for processing the Solys2 responses.
+
+It exports the following variables:
+    * ERROR_CODES : A dictionary containing all the error codes (and custom ones) with their
+        related error messages.
+
+It exports the following classes:
+    * ErrorCode : Enum that contains all possible Solys2 error codes and some custom ones.
+    * OutCode : Enum that represents the type of message received from the Solys2.
+
+It exports the following functions:
+    * process_response : Process the response given by the Solys2.
+"""
+
 from enum import Enum
 import re
 from typing import Union, Tuple, List
@@ -29,6 +44,9 @@ ERROR_CODES = {
 }
 
 class ErrorCode(Enum):
+    """
+    Enum that contains all possible Solys2 error codes and some custom ones.
+    """
     E1 = '1'
     E2 = '2'
     E3 = '3'
@@ -54,7 +72,7 @@ class ErrorCode(Enum):
 
 class OutCode(Enum):
     """
-    Enum that represents the type of message received from the Solys.
+    Enum that represents the type of message received from the Solys2.
 
     NONE: Empty message, or a response that is not for the sent command.
     ERROR: An error was encountered-
@@ -70,6 +88,19 @@ class OutCode(Enum):
     ANSWERED_VALUE_ERROR = 3
 
 def _int_hex(value: str) -> int:
+    """
+    Transforms a hexadecimal number from a string to the number.
+
+    Parameters
+    ----------
+    value : str
+        Hexadecimal number original str.
+
+    Returns
+    -------
+    hex : int
+        Hexadecimal number converted.
+    """
     return int(value, base=16)
 
 def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[float], OutCode, Union[str, None]]:
