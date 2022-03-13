@@ -333,10 +333,29 @@ class _BodyTracker:
         """
         self.mutex_cont = Lock()
         self.cont_track = _ContainedBool(True)
-        # Configure the logging output
+        self._configure_logger(log, logfile)
+        # Create thread
+        self.thread = Thread(target = _track_body, args = (ip, seconds, body, self.mutex_cont,
+            self.cont_track, self.logger, port, password))
+        self.thread.start()
+    
+    def _configure_logger(self, log: bool, logfile: str):
+        """Configure the logging output
+        
+        Shell logging at warning level and file logger at debug level if log is True.
+
+        Parameters
+        ----------
+        log : bool
+            True if some logging is required. Otherwise silent except for warnings and errors.
+        logfile : str
+            Path of the file where the logging will be stored. In case that it's not used, it will be
+            printed in stderr.
+        """
         randstr = _gen_random_str(20)
         logging.basicConfig(level=logging.WARNING)
-        logging.getLogger().setLevel(logging.WARNING)
+        for handler in logging.getLogger().handlers:
+            handler.setLevel(logging.WARNING)
         self.logger = logging.getLogger('autotrack._BodyTracker-{}'.format(randstr))
         if logfile != "":
             log_handler = logging.FileHandler(logfile, mode='w')
@@ -344,14 +363,11 @@ class _BodyTracker:
             self.logger.addHandler(log_handler)
             if log:
                 self.logger.setLevel(logging.DEBUG)
-                logging.getLogger().setLevel(logging.WARNING)
         elif log:
             logging.getLogger().setLevel(logging.DEBUG)
-        # Create thread
-        self.thread = Thread(target = _track_body, args = (ip, seconds, body, self.mutex_cont,
-            self.cont_track, self.logger, port, password))
-        self.thread.start()
-    
+            for handler in logging.getLogger().handlers:
+                handler.setLevel(logging.DEBUG)
+
     def stop_tracking(self):
         """
         Stop the tracking of the tracked body. The connection with the Solys2 will be closed and
