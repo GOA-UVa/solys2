@@ -341,11 +341,12 @@ class _BodyTracker:
         if logfile != "":
             log_handler = logging.FileHandler(logfile, mode='w')
             log_handler.setFormatter(logging.Formatter('%(levelname)s:%(message)s'))
-            if log:
-                log_handler.setLevel(logging.DEBUG)
             self.logger.addHandler(log_handler)
+            if log:
+                self.logger.setLevel(logging.DEBUG)
+                logging.getLogger().setLevel(logging.WARNING)
         elif log:
-            self.logger.setLevel(logging.DEBUG)
+            logging.getLogger().setLevel(logging.DEBUG)
         # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, body, self.mutex_cont,
             self.cont_track, self.logger, port, password))
