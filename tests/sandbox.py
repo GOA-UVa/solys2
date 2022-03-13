@@ -5,8 +5,8 @@ import re
 import time
 from typing import List, Tuple
 
-from solys2moon import solys2 as s2
-from solys2moon import autotrack as aut
+from solys2 import solys2 as s2
+from solys2 import autotrack as aut
 
 TCP_IP = "157.88.43.171"
 TCP_PORT = 15000
