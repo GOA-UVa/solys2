@@ -65,7 +65,7 @@ def pruebas_comandos_raw():
     s.close()
 
 def main():
-    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True)
+    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
 
 if __name__ == "__main__":
     main()
