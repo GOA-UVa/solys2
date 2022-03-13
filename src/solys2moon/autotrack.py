@@ -156,10 +156,15 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, con
     SolysException
         If an error happens when stablishing connection with the Solys2 for the first time.
     """
+    # Configure the logging output
     if log:
-        logging.basicConfig(level=logging.DEBUG)
-    if logfile != "":
+        if logfile != "":
+            logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w')
+        else:
+            logging.basicConfig(level=logging.DEBUG)
+    elif logfile != "":
         logging.basicConfig(filename=logfile, filemode='w')
+
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
