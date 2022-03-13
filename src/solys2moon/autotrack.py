@@ -17,6 +17,8 @@ import time
 import datetime
 import logging
 from threading import Thread, Lock
+import string
+import random
 
 """___Third-Party Modules___"""
 import pylunar
@@ -123,8 +125,9 @@ class _ContainedBool:
     """
     value : bool
 
-def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, cont_track : _ContainedBool,
-    port: int = 15000, password: str = "solys", log: bool = False, logfile: str = ""):
+def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
+    cont_track: _ContainedBool, logger: logging.Logger, port: int = 15000,
+    password: str = "solys"):
     """
     Track a celestial body
 
@@ -141,45 +144,33 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, con
     cont_track : _ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    logger : logging.Logger
+        Logger that will log out the log messages
     port : int
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    log : bool
-        True if some logging is required. Otherwise silent. Default is silent.
-    logfile : str
-        Path of the file where the logging will be stored. In case that it's not used, it will be
-        printed in standard output error.
 
     Raises
     ------
     SolysException
         If an error happens when stablishing connection with the Solys2 for the first time.
     """
-    # Configure the logging output
-    if log:
-        if logfile != "":
-            logging.basicConfig(level=logging.DEBUG, filename=logfile, filemode='w')
-        else:
-            logging.basicConfig(level=logging.DEBUG)
-    elif logfile != "":
-        logging.basicConfig(filename=logfile, filemode='w')
-
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
     lat, lon, _, ll_com = solys.get_location_pressure()
     if ll_com.out != response.OutCode.ANSWERED:
         if ll_com.err != None:
-            logging.error("ERROR obtaining coordinates: {}".format(solys2.translate_error(ll_com.err)))
+            logger.error("ERROR obtaining coordinates: {}".format(solys2.translate_error(ll_com.err)))
         else:
-            logging.error("ERROR obtaining coordinates. Unknown error.")
+            logger.error("ERROR obtaining coordinates. Unknown error.")
     if body == _TrackBody.SUN:
-        logging.info("Tracking sun. Connected with Solys2.")
+        logger.info("Tracking sun. Connected with Solys2.")
         get_position = _get_sun_position
         mi_coords = (lat, lon)
     else:
-        logging.info("Tracking moon. Connected with Solys2.")
+        logger.info("Tracking moon. Connected with Solys2.")
         get_position = _get_moon_position
         mi_coords = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
 
@@ -191,28 +182,28 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, con
     while cont_track.value:
         mutex_cont.release()
         dt = datetime.datetime.now(datetime.timezone.utc)
-        logging.debug("Waited {} seconds.".format(sleep_time))
+        logger.debug("Waited {} seconds.".format(sleep_time))
         az, ze = get_position(mi_coords, dt)
         try:
             prev_az, prev_ze, _ = solys.get_current_position()
             qsi, total_intens, _ = solys.get_sun_intensity()
             solys.set_azimuth(az)
             solys.set_zenith(ze)
-            logging.info("Datetime: {}".format(dt))
-            logging.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
-            logging.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-            logging.info("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
-            logging.info("")
+            logger.info("Datetime: {}".format(dt))
+            logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
+            logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
+            logger.info("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
+            logger.info("")
             while True:
                 q0, q1, _ = solys.get_queue_status()
                 queue = q0 + q1
                 if queue == 0:
                     break
-                logging.debug("Queue size {}. Sleeping 1 sec...".format(queue))
+                logger.debug("Queue size {}. Sleeping 1 sec...".format(queue))
                 time.sleep(1)
         except solys2.SolysException as e:
-            logging.error("Error at datetime: {}".format(dt))
-            logging.error(e)
+            logger.error("Error at datetime: {}".format(dt))
+            logger.error(e)
         tf = time.time()
         tdiff = tf - t0
         sleep_time = (seconds - tdiff)
@@ -222,10 +213,10 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock, con
         mutex_cont.acquire()
     mutex_cont.release()
     solys.close()
-    logging.info("Tracking stopped and connection closed.")
+    logger.info("Tracking stopped and connection closed.")
 
-def _track_moon(ip: str, seconds: float, mutex_cont: Lock, cont_track : _ContainedBool,
-    port: int = 15000, password: str = "solys", log: bool = False, logfile: str = ""):
+def _track_moon(ip: str, seconds: float, mutex_cont: Lock, cont_track: _ContainedBool,
+    logger: logging.Logger, port: int = 15000, password: str = "solys"):
     """
     Track the moon
 
@@ -240,26 +231,23 @@ def _track_moon(ip: str, seconds: float, mutex_cont: Lock, cont_track : _Contain
     cont_track : _ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    logger : logging.Logger
+        Logger that will log out the log messages
     port : int
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    log : bool
-        True if some logging is required. Otherwise silent. Default is silent.
-    logfile : str
-        Path of the file where the logging will be stored. In case that it's not used, it will be
-        printed in standard output error.
 
     Raises
     ------
     SolysException
         If an error happens when stablishing connection with the Solys2 for the first time.
     """
-    return _track_body(ip, seconds, _TrackBody.MOON, mutex_cont, cont_track, port, password,
-        log, logfile)
+    return _track_body(ip, seconds, _TrackBody.MOON, mutex_cont, cont_track, logger,
+        port, password)
 
-def _track_sun(ip: str, seconds: float, mutex_cont: Lock, cont_track : _ContainedBool,
-    port: int = 15000, password: str = "solys", log: bool = False, logfile: str = ""):
+def _track_sun(ip: str, seconds: float, mutex_cont: Lock, cont_track: _ContainedBool,
+    logger: logging.Logger, port: int = 15000, password: str = "solys"):
     """
     Track the sun
 
@@ -274,23 +262,36 @@ def _track_sun(ip: str, seconds: float, mutex_cont: Lock, cont_track : _Containe
     cont_track : _ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    logger : logging.Logger
+        Logger that will log out the log messages
     port : int
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    log : bool
-        True if some logging is required. Otherwise silent except for errors. Default is silent.
-    logfile : str
-        Path of the file where the logging will be stored. In case that it's not used, it will be
-        printed in standard output error.
 
     Raises
     ------
     SolysException
         If an error happens when stablishing connection with the Solys2 for the first time.
     """
-    return _track_body(ip, seconds, _TrackBody.SUN, mutex_cont, cont_track, port, password,
-        log, logfile)
+    return _track_body(ip, seconds, _TrackBody.SUN, mutex_cont, cont_track, logger,
+        port, password)
+
+def _gen_random_str(len: int) -> str:
+    """
+    Return a random str of the specified length.
+
+    Parameters
+    ----------
+    len : int
+        Length of the desired str.
+
+    Returns
+    -------
+    rand_str : str
+        Generated random str of the specified length.
+    """
+    ''.join(random.choice(string.ascii_letters) for i in range(len))
 
 class _BodyTracker:
     """_BodyTracker
@@ -304,6 +305,8 @@ class _BodyTracker:
     cont_track : _ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    logger : logging.Logger
+        Logger that will log out the log messages.
     thread : Thread
         Thread that will execute the tracking function.
     """
@@ -330,8 +333,17 @@ class _BodyTracker:
         """
         self.mutex_cont = Lock()
         self.cont_track = _ContainedBool(True)
+        # Configure the logging output
+        if log:
+                logging.basicConfig(level=logging.DEBUG)
+        randstr = _gen_random_str(20)
+        self.logger = logging.getLogger('bodytracker_logger_{}'.format(randstr))
+        if logfile != "":
+            log_handler = logging.FileHandler(logfile, mode='w')
+            self.logger.addHandler(log_handler)
+        # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, body, self.mutex_cont,
-            self.cont_track, port, password, log, logfile))
+            self.cont_track, self.logger, port, password))
         self.thread.start()
     
     def stop_tracking(self):
@@ -345,6 +357,10 @@ class _BodyTracker:
         self.mutex_cont.acquire()
         self.cont_track.value = False
         self.mutex_cont.release()
+        handlers = self.logger.handlers
+        for handler in handlers:
+            handler.close()
+            self.logger.removeHandler(handler)
 
 class MoonTracker(_BodyTracker):
     """MoonTracker
