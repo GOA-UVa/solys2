@@ -291,7 +291,7 @@ def _gen_random_str(len: int) -> str:
     rand_str : str
         Generated random str of the specified length.
     """
-    ''.join(random.choice(string.ascii_letters) for i in range(len))
+    return ''.join(random.choice(string.ascii_letters) for i in range(len))
 
 class _BodyTracker:
     """_BodyTracker
