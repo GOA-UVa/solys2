@@ -335,8 +335,8 @@ class _BodyTracker:
         self.cont_track = _ContainedBool(True)
         # Configure the logging output
         randstr = _gen_random_str(20)
-        self.logger = logging.getLogger('autotrack._BodyTracker-{}'.format(randstr))
         logging.basicConfig(level=logging.WARNING)
+        self.logger = logging.getLogger('autotrack._BodyTracker-{}'.format(randstr))
         if logfile != "":
             log_handler = logging.FileHandler(logfile, mode='w')
             log_handler.setFormatter(logging.Formatter('%(levelname)s:%(message)s'))
