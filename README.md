@@ -1,7 +1,7 @@
-# solys2moon
+# solys2
 
-Python package for connecting and communicating with the Solys 2 and setting it up
-to automatically track the moon or the sun.
+Python package for connecting and communicating with the Solys 2 via TCP/IP
+and setting it up to automatically track the moon or the sun.
 
 ## Requirements
 
@@ -13,5 +13,39 @@ pysolar>=0.10
 ## Installation
 
 ```sh
-pip install solys2moon
+pip install solys2
+```
+
+## Usage
+
+### Direct communication
+
+```python
+from solys2 import solys2
+
+# Connect with the Solys2
+solys = solys2.Solys2(ip, port, password)
+
+# Tell the Solys2 to point at azimuth 30.
+solys.set_azimuth(30)
+
+# Get the current position at which the solys is pointing.
+az, ze, _ = solys.get_current_position()
+
+# Send the command "HO" to the Solys2
+output = solys.send_command("HO")
+# Another option would have been calling solys.home()
+```
+
+### Automatic tracking
+
+```python
+from solys2 import autotrack
+
+# Track the sun, sending a new position each 15 seconds, and logging the
+# information (movements, etc) to a file called "solys.log"
+st = autotrack.SunTracker(ip, 15, port, password, True, "solys.log")
+
+# Stop tracking the Sun
+st.stop_tracking()
 ```
