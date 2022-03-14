@@ -71,6 +71,16 @@ def prueba_cross():
     logger = logging.getLogger("sandbox")
     aut._cross_body(TCP_IP, aut._TrackBody.SUN, logger, cp, TCP_PORT, "solys")
 
+def prueba_black():
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("sandbox")
+    aut.black_moon(TCP_IP, logger, 15)
+
+def prueba_track():
+    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
+    while not st.is_finished():
+        time.sleep(1)
+
 def main():
     prueba_cross()
     #st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
