@@ -231,6 +231,7 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
                     break
                 logger.debug("Position difference too large: {}. Azimuth: {} vs {}. Zenith: {} vs \
 {}.".format(pos_dif, az, prev_az, ze, prev_ze))
+                logger.debug("Sleeping 1 sec...")
                 time.sleep(1)
         except solys2.SolysException as e:
             logger.error("Error at datetime: {}".format(dt))
@@ -345,6 +346,7 @@ zenith range [{},{}), steps {}.".format(cp.measure_seconds, cp.azimuth_min_offse
                     break
                 logger.debug("Position difference too large: {}. Azimuth: {} vs {}. Zenith: {} vs \
 {}.".format(pos_dif, new_az, prev_az, new_ze, prev_ze))
+                logger.debug("Sleeping 1 sec...")
                 time.sleep(1)
         except solys2.SolysException as e:
             logger.error("Error at datetime: {}".format(dt))
