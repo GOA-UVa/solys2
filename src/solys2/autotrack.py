@@ -12,7 +12,7 @@ It exports the following classes:
 """___Built-In Modules___"""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, List
+from typing import Tuple, List, Callable, Union
 import time
 import datetime
 import logging
@@ -23,6 +23,7 @@ import random
 """___Third-Party Modules___"""
 import pylunar
 from pysolar import solar
+import numpy as np
 
 """___Solys2 Modules___"""
 from . import response
@@ -125,9 +126,43 @@ class _ContainedBool:
     """
     value : bool
 
+def _get_position_function(solys: solys2.Solys2, body: _TrackBody, logger: logging.Logger
+    ) -> Tuple[Callable[[Union[Tuple[float, float], pylunar.MoonInfo], datetime.datetime],
+    Tuple[float, float]], Union[Tuple[float, float], pylunar.MoonInfo]]:
+    """
+    Parameters
+    ----------
+    solys : solys2.Solys2
+        Solys2 instance that will be used to send de messages with.
+    body : _TrackBody
+        Body that will be performed the cross on. Moon or Sun.
+    logger : logging.Logger
+        Logger that will log out the log messages
+
+    Returns
+    -------
+    get_position : function
+        Function that will return the zenith and azimuth of the selected body.
+    mi_params : tuple of two floats (lat, lon) or MoonInfo
+        The parameter of the returned function get_position.
+    """
+    lat, lon, _, ll_com = solys.get_location_pressure()
+    if ll_com.out != response.OutCode.ANSWERED:
+        if ll_com.err != None:
+            logger.error("ERROR obtaining coordinates: {}".format(solys2.translate_error(ll_com.err)))
+        else:
+            logger.error("ERROR obtaining coordinates. Unknown error.")
+    if body == _TrackBody.SUN:
+        get_position = _get_sun_position
+        mi_coords = (lat, lon)
+    else:
+        get_position = _get_moon_position
+        mi_coords = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
+    return get_position, mi_coords
+
 def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     cont_track: _ContainedBool, logger: logging.Logger, port: int = 15000,
-    password: str = "solys"):
+    password: str = "solys", is_finished: _ContainedBool = None):
     """
     Track a celestial body
 
@@ -150,6 +185,9 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
+    is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it should be changed
+        to True when exiting the function.
 
     Raises
     ------
@@ -159,21 +197,11 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
-    lat, lon, _, ll_com = solys.get_location_pressure()
-    if ll_com.out != response.OutCode.ANSWERED:
-        if ll_com.err != None:
-            logger.error("ERROR obtaining coordinates: {}".format(solys2.translate_error(ll_com.err)))
-        else:
-            logger.error("ERROR obtaining coordinates. Unknown error.")
+    get_position, mi_coords = _get_position_function(solys, body, logger)
     if body == _TrackBody.SUN:
         logger.info("Tracking sun. Connected with Solys2.")
-        get_position = _get_sun_position
-        mi_coords = (lat, lon)
     else:
         logger.info("Tracking moon. Connected with Solys2.")
-        get_position = _get_moon_position
-        mi_coords = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
-
     # Start tracking in a loop
     sleep_time = 0
     t0 = time.time()
@@ -182,7 +210,7 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     while cont_track.value:
         mutex_cont.release()
         dt = datetime.datetime.now(datetime.timezone.utc)
-        logger.debug("Waited {} seconds.".format(sleep_time))
+        logger.debug("Waited {} seconds.\n".format(sleep_time))
         az, ze = get_position(mi_coords, dt)
         try:
             prev_az, prev_ze, _ = solys.get_current_position()
@@ -192,8 +220,7 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
             logger.info("Datetime: {}".format(dt))
             logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
             logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-            logger.info("Sent positions: Azimuth: {}. Zenith: {}.".format(az, ze))
-            logger.info("")
+            logger.info("Sent positions: Azimuth: {}. Zenith: {}.\n".format(az, ze))
             while True:
                 q0, q1, _ = solys.get_queue_status()
                 queue = q0 + q1
@@ -213,69 +240,163 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
         mutex_cont.acquire()
     mutex_cont.release()
     solys.close()
+    if is_finished:
+        is_finished.value = True
     logger.info("Tracking stopped and connection closed.")
 
-def _track_moon(ip: str, seconds: float, mutex_cont: Lock, cont_track: _ContainedBool,
-    logger: logging.Logger, port: int = 15000, password: str = "solys"):
+@dataclass
+class CrossParameters:
     """
-    Track the moon
+    Parameters needed when performing a cross over a Body.
+
+    The offset attributes will define the interval that will be per
+
+    Attributes
+    ----------
+    measure_seconds : float
+        Amount of seconds that the Solys2 will wait on each cross point.
+    azimuth_min_offset : float
+        Minimum value of azimuth offset in degrees. Included in the interval.
+    azimuth_max_offset : float
+        Maximum value of azimuth offset in degrees. Not included in the interval.
+    azimuth_step : float
+        Amount of degrees that are between each azimuth cross point.
+    zenith_min_offset : float
+        Minimum value of zenith offset in degrees. Included in the interval.
+    zenith_max_offset : float
+        Maximum value of zenith offset in degrees. Not included in the interval.
+    zenith_step : float
+        Amount of degrees that are between each zenith cross point.
+    """
+    measure_seconds: float
+    azimuth_min_offset: float
+    azimuth_max_offset: float
+    azimuth_step: float
+    zenith_min_offset: float
+    zenith_max_offset: float
+    zenith_step: float
+
+def _cross_body(ip: str, body: _TrackBody, logger: logging.Logger, cross_params: CrossParameters,
+    port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None):
+    """
+    Perform a cross over a body
 
     Parameters
     ----------
     ip : str
         IP of the solys.
-    seconds : float
-        Amount of seconds waited between each change of position of zenith and azimuth.
-    mutex_cont : Lock
-        Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
-        Container for the boolean value that represents if the tracking must stop or if it should
-        continue.
+    body : _TrackBody
+        Body that where the cross will be performed on. Moon or Sun.
     logger : logging.Logger
         Logger that will log out the log messages
+    cross_params : CrossParameters
+        Parameters needed when performing a cross over a Body.
     port : int
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-
-    Raises
-    ------
-    SolysException
-        If an error happens when stablishing connection with the Solys2 for the first time.
+    is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it should be changed
+        to True when exiting the function.
     """
-    return _track_body(ip, seconds, _TrackBody.MOON, mutex_cont, cont_track, logger,
-        port, password)
+    # Connect with the Solys2 and set the initial configuration.
+    solys = solys2.Solys2(ip, port, password)
+    solys.set_power_save(False)
+    get_position, mi_coords = _get_position_function(solys, body, logger)
+    if body == _TrackBody.SUN:
+        logger.info("Performing a solar cross. Connected with Solys2.")
+    else:
+        logger.info("Performing a lunar cross. Connected with Solys2.")
+    sleep_time = 0
+    cp = cross_params
+    logger.info("Performing cross waiting {} seconds, with azimuth range [{},{}), steps {}, and \
+zenith range [{},{}), steps {}.".format(cp.measure_seconds, cp.azimuth_min_offset,
+        cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
+        cp.zenith_step))
+    offsets = [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset, cp.azimuth_step)]
+    offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset, cp.zenith_step)]
+    seconds = cp.measure_seconds
+    t0 = time.time()
+    for offset in offsets:
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        logger.debug("Waited {} seconds.\n".format(sleep_time))
+        az, ze = get_position(mi_coords, dt)
+        try:
+            prev_az, prev_ze, _ = solys.get_current_position()
+            qsi, total_intens, _ = solys.get_sun_intensity()
+            solys.set_azimuth(az + offset[0])
+            solys.set_zenith(ze + offset[1])
+            logger.info("Datetime: {}".format(dt))
+            logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
+            logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
+            logger.info("Sent positions: Azimuth: {} + {}. Zenith: {} + {}.\n".format(az, offset[0],
+                ze, offset[1]))
+            while True:
+                q0, q1, _ = solys.get_queue_status()
+                queue = q0 + q1
+                if queue == 0:
+                    break
+                logger.debug("Queue size {}. Sleeping 1 sec...".format(queue))
+                time.sleep(1)
+        except solys2.SolysException as e:
+            logger.error("Error at datetime: {}".format(dt))
+            logger.error(e)
+        tf = time.time()
+        tdiff = tf - t0
+        sleep_time = seconds
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+        t0 = time.time()
+    solys.close()
+    if is_finished:
+        is_finished.value = True
+    logger.info("Tracking stopped and connection closed.")
 
-def _track_sun(ip: str, seconds: float, mutex_cont: Lock, cont_track: _ContainedBool,
-    logger: logging.Logger, port: int = 15000, password: str = "solys"):
+def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
+    password: str = "solys", is_finished: _ContainedBool = None):
     """
-    Track the sun
+    Perform a cross over the Moon
 
     Parameters
     ----------
     ip : str
         IP of the solys.
-    seconds : float
-        Amount of seconds waited between each change of position of zenith and azimuth.
-    mutex_cont : Lock
-        Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
-        Container for the boolean value that represents if the tracking must stop or if it should
-        continue.
     logger : logging.Logger
         Logger that will log out the log messages
+    cross_params : CrossParameters
+        Parameters needed when performing a cross over a Body.
     port : int
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-
-    Raises
-    ------
-    SolysException
-        If an error happens when stablishing connection with the Solys2 for the first time.
+    is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it should be changed
+        to True when exiting the function.
     """
-    return _track_body(ip, seconds, _TrackBody.SUN, mutex_cont, cont_track, logger,
-        port, password)
+    return _cross_body(ip, _TrackBody.MOON, logger, cross_params, port, password, is_finished)
+
+def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
+    password: str = "solys", is_finished: _ContainedBool = None):
+    """
+    Perform a cross over the Sun
+
+    Parameters
+    ----------
+    ip : str
+        IP of the solys.
+    logger : logging.Logger
+        Logger that will log out the log messages
+    cross_params : CrossParameters
+        Parameters needed when performing a cross over a Body.
+    port : int
+        Access port. By default 15000.
+    password : str
+        Ethernet user password. By default is "solys".
+    is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it should be changed
+        to True when exiting the function.
+    """
+    return _cross_body(ip, _TrackBody.SUN, logger, cross_params, port, password, is_finished)
 
 def _gen_random_str(len: int) -> str:
     """
@@ -309,6 +430,9 @@ class _BodyTracker:
         Logger that will log out the log messages.
     thread : Thread
         Thread that will execute the tracking function.
+    _is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it will be True
+        when the thread has successfully ended execution.
     """
     def __init__(self, ip: str, seconds: float, body: _TrackBody, port: int = 15000,
         password: str = "solys", log: bool = False, logfile: str = ""):
@@ -334,9 +458,10 @@ class _BodyTracker:
         self.mutex_cont = Lock()
         self.cont_track = _ContainedBool(True)
         self._configure_logger(log, logfile)
+        self._is_finished = _ContainedBool(False)
         # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, body, self.mutex_cont,
-            self.cont_track, self.logger, port, password))
+            self.cont_track, self.logger, port, password, self._is_finished))
         self.thread.start()
     
     def _configure_logger(self, log: bool, logfile: str):
@@ -383,6 +508,18 @@ class _BodyTracker:
         for handler in handlers:
             handler.close()
             self.logger.removeHandler(handler)
+    
+    def is_finished(self) -> bool:
+        """
+        Check if the thread has successfully finished executing. This requires having had called
+        stop_tracking() and waited the needed seconds to be True.
+
+        Returns
+        -------
+        has_finished : bool
+            True if it has finished successfully.
+        """
+        return self._is_finished.value
 
 class MoonTracker(_BodyTracker):
     """MoonTracker

@@ -4,6 +4,7 @@ from enum import Enum
 import re
 import time
 from typing import List, Tuple
+import logging
 
 from solys2 import solys2 as s2
 from solys2 import autotrack as aut
@@ -64,8 +65,15 @@ def pruebas_comandos_raw():
     #send_command(s, "PO 1 40")
     s.close()
 
+def prueba_cross():
+    cp = aut.CrossParameters(30, -1.5, 1.501, 0.3, -1.501, 1.5, 0.3)
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("sandbox")
+    aut._cross_body(TCP_IP, aut._TrackBody.SUN, logger, cp, TCP_PORT, "solys")
+
 def main():
-    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
+    prueba_cross()
+    #st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
 
 if __name__ == "__main__":
     main()
