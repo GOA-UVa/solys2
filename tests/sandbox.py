@@ -66,7 +66,7 @@ def pruebas_comandos_raw():
     s.close()
 
 def prueba_cross():
-    cp = aut.CrossParameters(30, -1.5, 1.501, 0.3, -1.501, 1.5, 0.3)
+    cp = aut.CrossParameters(30, -1.5, 1.501, 0.3, -1.5, 1.501, 0.3)
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger("sandbox")
     aut._cross_body(TCP_IP, aut._TrackBody.SUN, logger, cp, TCP_PORT, "solys")
@@ -80,7 +80,7 @@ def prueba_track():
     st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
 
 def main():
-    prueba_track()
+    prueba_cross()
 
 if __name__ == "__main__":
     main()
