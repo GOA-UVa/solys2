@@ -78,12 +78,9 @@ def prueba_black():
 
 def prueba_track():
     st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
-    while not st.is_finished():
-        time.sleep(1)
 
 def main():
-    prueba_cross()
-    #st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
+    prueba_track()
 
 if __name__ == "__main__":
     main()

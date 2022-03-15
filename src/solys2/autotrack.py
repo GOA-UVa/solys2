@@ -160,6 +160,77 @@ def _get_position_function(solys: solys2.Solys2, body: _TrackBody, logger: loggi
         mi_coords = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
     return get_position, mi_coords
 
+def _wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: logging.Logger):
+    """
+    Waits until the solys is approx. pointing at the given position.
+
+    Parameters
+    ----------
+    solys : solys2.Solys2
+        Solys2 that will eventuallyp point to the given position.
+    az : float
+        Azimuth of the position.
+    ze : float
+        Zenith of the position.
+    logger : logging.Logger
+        Logger that will log out the log messages.
+    """
+    while True:
+        # get_queue_status is not that reliable
+        prev_az, prev_ze, _ = solys.get_current_position()
+        pos_dif = abs(az - prev_az) +  abs(ze - prev_ze)
+        if pos_dif <= 0.01:
+            break
+        logger.debug("Position difference too large: {}. Azimuth: {} vs {}. Zenith: {} vs \
+{}.".format(pos_dif, az, prev_az, ze, prev_ze))
+        logger.debug("Sleeping 1 second...")
+        time.sleep(1)
+
+def _read_and_move(solys: solys2.Solys2, get_position: Callable,
+    mi_coords: Union[Tuple[float, float], pylunar.MoonInfo], logger: logging.Logger,
+    offset: Tuple[float, float] = (0,0)):
+    """
+    Reads some information from the solys and writes it down to the logger.
+    Then it moves it to a position using the given position function and parameters.
+
+    Parameters
+    ----------
+    solys : solys2.Solys2
+        Solys2 in which to perform the read and move actions.
+    get_position : function
+        Function that will return the zenith and azimuth of the selected body.
+    mi_params : tuple of two floats (lat, lon) or MoonInfo
+        The parameter of the returned function get_position.
+    logger : logging.Logger
+        Logger that will log out the log messages.
+    offset : tuple of 2 floats.
+        It will move to the calculated position + some optional offset in degrees.
+        (azimuth_offset, zenith_offset). By default (0,0).
+    """
+    dt = datetime.datetime.now(datetime.timezone.utc)
+    logger.info("UTC Datetime: {}.".format(dt))
+    try:
+        prev_az, prev_ze, _ = solys.get_current_position()
+        qsi, total_intens, _ = solys.get_sun_intensity()
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        az, ze = get_position(mi_coords, dt)
+        new_az = min(360, az + offset[0])
+        new_ze = min(90, ze + offset[1])
+        solys.set_azimuth(new_az)
+        solys.set_zenith(new_ze)
+        logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
+        logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
+        logger.info("UTC Datetime: {}".format(dt))
+        logger.info("Sent positions: Azimuth: {} + {}. Zenith: {} + {}.\n".format(az, offset[0],
+            ze, offset[1]))
+        _wait_position_reached(solys, new_az, new_ze, logger)
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        logger.info("Finished moving at UTC datetime: {}.".format(dt)) 
+    except solys2.SolysException as e:
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        logger.error("Error at UTC datetime: {}".format(dt))
+        logger.error("Error: {}".format(e))
+
 def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     cont_track: _ContainedBool, logger: logging.Logger, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None):
@@ -171,7 +242,7 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     ip : str
         IP of the solys.
     seconds : float
-        Amount of seconds waited between each change of position of zenith and azimuth.
+        Amount of seconds waited between each message of change of position of zenith and azimuth.
     body : _TrackBody
         Body that will be tracked. Moon or Sun.
     mutex_cont : Lock
@@ -209,33 +280,8 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     cont_track.value = True
     while cont_track.value:
         mutex_cont.release()
-        dt = datetime.datetime.now(datetime.timezone.utc)
         logger.debug("Waited {} seconds.\n".format(sleep_time))
-        az, ze = get_position(mi_coords, dt)
-        az = min(360, az)
-        ze = min(90, ze)
-        try:
-            prev_az, prev_ze, _ = solys.get_current_position()
-            qsi, total_intens, _ = solys.get_sun_intensity()
-            solys.set_azimuth(az)
-            solys.set_zenith(ze)
-            logger.info("Datetime: {}".format(dt))
-            logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
-            logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-            logger.info("Sent positions: Azimuth: {}. Zenith: {}.\n".format(az, ze))
-            while True:
-                # get_queue_status is not that reliable
-                prev_az, prev_ze, _ = solys.get_current_position()
-                pos_dif = abs(az - prev_az) +  abs(ze - prev_ze)
-                if pos_dif <= 0.01:
-                    break
-                logger.debug("Position difference too large: {}. Azimuth: {} vs {}. Zenith: {} vs \
-{}.".format(pos_dif, az, prev_az, ze, prev_ze))
-                logger.debug("Sleeping 1 sec...")
-                time.sleep(1)
-        except solys2.SolysException as e:
-            logger.error("Error at datetime: {}".format(dt))
-            logger.error(e)
+        _read_and_move(solys, get_position, mi_coords, logger)
         tf = time.time()
         tdiff = tf - t0
         sleep_time = (seconds - tdiff)
@@ -312,51 +358,23 @@ def _cross_body(ip: str, body: _TrackBody, logger: logging.Logger, cross_params:
         logger.info("Performing a solar cross. Connected with Solys2.")
     else:
         logger.info("Performing a lunar cross. Connected with Solys2.")
-    sleep_time = 0
     cp = cross_params
     logger.info("Performing cross waiting {} seconds, with azimuth range [{},{}), steps {}, and \
 zenith range [{},{}), steps {}.".format(cp.measure_seconds, cp.azimuth_min_offset,
         cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
         cp.zenith_step))
-    offsets = [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset, cp.azimuth_step)]
+    # Generating the offsets
+    offsets: List[Tuple[float, float]] = \
+        [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset, cp.azimuth_step)]
     offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset, cp.zenith_step)]
+    sleep_time = 0
     seconds = cp.measure_seconds
-    t0 = time.time()
     for offset in offsets:
-        dt = datetime.datetime.now(datetime.timezone.utc)
         logger.debug("Waited {} seconds.\n".format(sleep_time))
-        az, ze = get_position(mi_coords, dt)
-        new_az = min(360, az + offset[0])
-        new_ze = min(90, ze + offset[1])
-        try:
-            prev_az, prev_ze, _ = solys.get_current_position()
-            qsi, total_intens, _ = solys.get_sun_intensity()
-            solys.set_azimuth(new_az)
-            solys.set_zenith(new_ze)
-            logger.info("Datetime: {}".format(dt))
-            logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
-            logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-            logger.info("Sent positions: Azimuth: {} + {}. Zenith: {} + {}.\n".format(az, offset[0],
-                ze, offset[1]))
-            while True:
-                # get_queue_status is not that reliable
-                prev_az, prev_ze, _ = solys.get_current_position()
-                pos_dif = abs(new_az - prev_az) +  abs(new_ze - prev_ze)
-                if pos_dif <= 0.01:
-                    break
-                logger.debug("Position difference too large: {}. Azimuth: {} vs {}. Zenith: {} vs \
-{}.".format(pos_dif, new_az, prev_az, new_ze, prev_ze))
-                logger.debug("Sleeping 1 sec...")
-                time.sleep(1)
-        except solys2.SolysException as e:
-            logger.error("Error at datetime: {}".format(dt))
-            logger.error(e)
-        tf = time.time()
-        tdiff = tf - t0
+        _read_and_move(solys, get_position, mi_coords, logger, offset)
         sleep_time = seconds
         if sleep_time > 0:
             time.sleep(sleep_time)
-        t0 = time.time()
     solys.close()
     if is_finished:
         is_finished.value = True
@@ -445,29 +463,11 @@ def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 
         az_offset *= -1
     if ze > 45:
         ze_offset *= -1
-    new_az = min(360, az + az_offset)
-    new_ze = min(90, ze + ze_offset)
-    solys.set_azimuth(new_az)
-    solys.set_zenith(new_ze)
-    logger.info("Datetime: {}".format(dt))
-    logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
-    logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-    logger.info("Sent positions: Azimuth: {} + {}. Zenith: {} + {}.\n".format(az, az_offset,
-        ze, ze_offset))
-    while True:
-        # get_queue_status is not that reliable
-        prev_az, prev_ze, _ = solys.get_current_position()
-        pos_dif = abs(new_az - prev_az) +  abs(new_ze - prev_ze)
-        if pos_dif <= 0.01:
-            break
-        logger.debug("Position difference too large: {}. Azimuth: {} vs {}. Zenith: {} vs \
-{}.".format(pos_dif, new_az, prev_az, new_ze, prev_ze))
-        logger.debug("Sleeping 1 sec...")
-        time.sleep(1)
+    _read_and_move(solys, get_position, mi_coords, logger, (az_offset, ze_offset))
     dt = datetime.datetime.now(datetime.timezone.utc)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
-    logger.info("Datetime: {}".format(dt))
+    logger.info("UTC Datetime: {}".format(dt))
     logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
     logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
     solys.close()
@@ -519,7 +519,8 @@ class _BodyTracker:
         ip : str
             IP of the solys.
         seconds : float
-            Amount of seconds waited between each change of position of zenith and azimuth.
+            Amount of seconds waited between each message of change of position of zenith and
+            azimuth.
         body : _TrackBody
             Body that will be tracked. Moon or Sun.
         port : int
@@ -611,7 +612,8 @@ class MoonTracker(_BodyTracker):
         ip : str
             IP of the solys.
         seconds : float
-            Amount of seconds waited between each change of position of zenith and azimuth.
+            Amount of seconds waited between each message of change of position of zenith and
+            azimuth.
         port : int
             Access port. By default 15000.
         password : str
@@ -637,7 +639,8 @@ class SunTracker(_BodyTracker):
         ip : str
             IP of the solys.
         seconds : float
-            Amount of seconds waited between each change of position of zenith and azimuth.
+            Amount of seconds waited between each message of change of position of zenith and
+            azimuth.
         port : int
             Access port. By default 15000.
         password : str
