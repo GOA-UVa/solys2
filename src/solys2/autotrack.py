@@ -181,8 +181,9 @@ def _wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: l
         pos_dif = abs(az - prev_az) +  abs(ze - prev_ze)
         if pos_dif <= 0.01:
             break
-        logger.debug("Position difference too large: {}. Azimuth: {} vs {}. Zenith: {} vs \
-{}.".format(pos_dif, az, prev_az, ze, prev_ze))
+        logger.debug("Position difference too large: {}. (Expected vs Actual)".format(pos_dif))
+        logger.debug("Azimuth {:0.5f} vs {}. Zenith: {:0.5f} vs {}.".format(az, prev_az,
+            ze, prev_ze))
         logger.debug("Sleeping 1 second...")
         time.sleep(1)
 
@@ -221,8 +222,8 @@ def _read_and_move(solys: solys2.Solys2, get_position: Callable,
         logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
         logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
         logger.info("UTC Datetime: {}".format(dt))
-        logger.info("Sent positions: Azimuth: {} + {}. Zenith: {} + {}.\n".format(az, offset[0],
-            ze, offset[1]))
+        logger.info("Sent positions: Azimuth: {} + {} ({}). Zenith: {} + {} ({}).\n".format(az,
+            offset[0], new_az, ze, offset[1], new_ze))
         _wait_position_reached(solys, new_az, new_ze, logger)
         dt = datetime.datetime.now(datetime.timezone.utc)
         logger.info("Finished moving at UTC datetime: {}.".format(dt)) 
