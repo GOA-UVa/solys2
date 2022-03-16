@@ -28,7 +28,8 @@ from . import response
 from . import connection
 
 """___Authorship___"""
-__author__ = "Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, and Ramiro González Catón"
+__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
+Roberto Román, Carlos Toledano'
 __created__ = "2022/03/09"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
@@ -445,6 +446,23 @@ class Solys2:
         output = self.send_command("PO 1 {}".format(zenith))
         return output
     
+    def point_down(self) -> CommandOutput:
+        """Point down as much as possible
+        Set the zenith angle to the maximum possible (94.5)
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+        
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("PO 1 94.9")
+        return output
+
     def get_planned_position(self) -> Tuple[int, int, CommandOutput]:
         """Position (PO)
         Obtain the positions that the Solys sais it's going to.
