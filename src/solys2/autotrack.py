@@ -12,7 +12,7 @@ It exports the following classes:
 """___Built-In Modules___"""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, List, Callable, Union
+from typing import Any, Callable, Dict, Tuple, List, ClassVar
 import time
 import datetime
 import logging
@@ -28,35 +28,15 @@ import numpy as np
 """___Solys2 Modules___"""
 from . import response
 from . import solys2
+from . import positioncalc as psc
 
 """___Authorship___"""
-__author__ = "Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, and Ramiro González Catón"
+__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
+Roberto Román, Carlos Toledano'
 __created__ = "2022/03/10"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
 __status__ = "Development"
-
-def _decdeg2dms(dd: float) -> Tuple[int, int, int]:
-    """
-    Converts decimal degrees to degree, minute, second
-
-    Parameters
-    ----------
-    dd : float
-        Value to be transformed from decimal degrees.
-
-    Returns
-    -------
-    deg : int
-        Degrees.
-    mnt : int
-        Minutes.
-    sec : int
-        Seconds.
-    """
-    mnt, sec = divmod(dd * 3600, 60)
-    deg, mnt = divmod(mnt, 60)
-    return int(deg), int(mnt), int(sec)
 
 class _TrackBody(Enum):
     """
@@ -68,56 +48,6 @@ class _TrackBody(Enum):
     SUN = 0
     MOON = 1
 
-def _get_moon_position(mi: pylunar.MoonInfo, dt: datetime.datetime) -> Tuple[float, float]:
-    """
-    Obtain lunar azimuth and zenith.
-
-    Parameters
-    ----------
-    mi : pylunar.MoonInfo
-        MoonInfo with the geographical coordinates of the observer already set, that will be used
-        to calculate the lunar position.
-    dt : datetime.datetime
-        Datetime at which the lunar position will be calculated.
-
-    Returns
-    -------
-    azimuth : float
-        Lunar azimuth calculated.
-    zenith : float
-        Lunar zenith calculated.
-    """
-    mi.update(dt)
-    az = mi.azimuth()
-    ze = 90-mi.altitude()
-    return az, ze
-
-def _get_sun_position(coords: Tuple[float, float], dt: datetime.datetime) -> Tuple[float, float]:
-    """
-    Obtain solar azimuth and zenith.
-
-    Parameters
-    ----------
-    coords : tuple of two floats.
-        (latitude, longitude)
-        Geographical coordinates of the observer that will be used to calculate
-        the solar position.
-    dt : datetime.datetime
-        Datetime at which the solar position will be calculated.
-
-    Returns
-    -------
-    azimuth : float
-        Solar azimuth calculated.
-    zenith : float
-        Solar zenith calculated.
-    """
-    lat = coords[0]
-    lon = coords[1]
-    az = solar.get_azimuth(lat, lon, dt)
-    ze = 90-solar.get_altitude(lat, lon, dt)
-    return az, ze
-
 @dataclass
 class _ContainedBool:
     """
@@ -126,25 +56,27 @@ class _ContainedBool:
     """
     value : bool
 
-def _get_position_function(solys: solys2.Solys2, body: _TrackBody, logger: logging.Logger
-    ) -> Tuple[Callable[[Union[Tuple[float, float], pylunar.MoonInfo], datetime.datetime],
-    Tuple[float, float]], Union[Tuple[float, float], pylunar.MoonInfo]]:
+def _get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger: logging.Logger,
+    altitude: float = 0, kernels_path: str = "./kernels") -> psc.BodyCalculator:
     """
     Parameters
     ----------
     solys : solys2.Solys2
         Solys2 instance that will be used to send de messages with.
-    body : _TrackBody
-        Body that will be performed the cross on. Moon or Sun.
+    library : _BodyLibrary
+        Body library that will be used to track the body. Moon or Sun.
     logger : logging.Logger
         Logger that will log out the log messages
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
 
     Returns
     -------
-    get_position : function
-        Function that will return the zenith and azimuth of the selected body.
-    mi_params : tuple of two floats (lat, lon) or MoonInfo
-        The parameter of the returned function get_position.
+    calc : BodyCalculator
+        Calculator that will be able to calculate the position of the body for a given date.
     """
     lat, lon, _, ll_com = solys.get_location_pressure()
     if ll_com.out != response.OutCode.ANSWERED:
@@ -152,13 +84,18 @@ def _get_position_function(solys: solys2.Solys2, body: _TrackBody, logger: loggi
             logger.error("ERROR obtaining coordinates: {}".format(solys2.translate_error(ll_com.err)))
         else:
             logger.error("ERROR obtaining coordinates. Unknown error.")
-    if body == _TrackBody.SUN:
-        get_position = _get_sun_position
-        mi_coords = (lat, lon)
-    else:
-        get_position = _get_moon_position
-        mi_coords = pylunar.MoonInfo(_decdeg2dms(lat), _decdeg2dms(lon))
-    return get_position, mi_coords
+    switcher: Dict[int, psc.BodyCalculator] = {
+        psc._BodyLibrary.EPHEM.value: psc.EphemMoonCalc,
+        psc._BodyLibrary.SPICEDMOON.value: psc.SpiceMoonCalc,
+        psc._BodyLibrary.PYLUNAR.value: psc.PylunarMoonCalc,
+        psc._BodyLibrary.PYSOLAR.value: psc.PysolarSunCalc
+    }
+    body_calc_class = switcher[library.value]
+    if library.value == psc._BodyLibrary.SPICEDMOON.value:
+        logger.debug("Using spicedmoon library.")
+        return body_calc_class(lat, lon, altitude, kernels_path)
+    logger.debug("Using {} library.".format(library.name))
+    return body_calc_class(lat, lon)
 
 def _wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: logging.Logger):
     """
@@ -187,9 +124,8 @@ def _wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: l
         logger.debug("Sleeping 1 second...")
         time.sleep(1)
 
-def _read_and_move(solys: solys2.Solys2, get_position: Callable,
-    mi_coords: Union[Tuple[float, float], pylunar.MoonInfo], logger: logging.Logger,
-    offset: Tuple[float, float] = (0,0)):
+def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: logging.Logger,
+    offset: Tuple[float, float] = (0,0), datetime_offset: float = 0):
     """
     Reads some information from the solys and writes it down to the logger.
     Then it moves it to a position using the given position function and parameters.
@@ -198,43 +134,46 @@ def _read_and_move(solys: solys2.Solys2, get_position: Callable,
     ----------
     solys : solys2.Solys2
         Solys2 in which to perform the read and move actions.
-    get_position : function
-        Function that will return the zenith and azimuth of the selected body.
-    mi_params : tuple of two floats (lat, lon) or MoonInfo
-        The parameter of the returned function get_position.
+    body_calc : BodyCalculator
+        Calculator that will be able to calculate the position of the body for a given date.
     logger : logging.Logger
         Logger that will log out the log messages.
     offset : tuple of 2 floats.
         It will move to the calculated position + some optional offset in degrees.
         (azimuth_offset, zenith_offset). By default (0,0).
+    datetime_offset : float
+        Offset of seconds that the body positions will be calculated, added to currrent time.
     """
     dt = datetime.datetime.now(datetime.timezone.utc)
     logger.info("UTC Datetime: {}.".format(dt))
     try:
         prev_az, prev_ze, _ = solys.get_current_position()
         qsi, total_intens, _ = solys.get_sun_intensity()
+        logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
+        logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
         dt = datetime.datetime.now(datetime.timezone.utc)
-        az, ze = get_position(mi_coords, dt)
+        logger.info("Real UTC Datetime: {}".format(dt))
+        dt = dt + datetime.timedelta(0, datetime_offset)
+        logger.info("Position UTC Datetime: {}".format(dt))
+        az, ze = body_calc.get_position(dt)
         new_az = min(360, az + offset[0])
         new_ze = min(90, ze + offset[1])
         solys.set_azimuth(new_az)
         solys.set_zenith(new_ze)
-        logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
-        logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-        logger.info("UTC Datetime: {}".format(dt))
         logger.info("Sent positions: Azimuth: {} + {} ({}). Zenith: {} + {} ({}).\n".format(az,
             offset[0], new_az, ze, offset[1], new_ze))
         _wait_position_reached(solys, new_az, new_ze, logger)
         dt = datetime.datetime.now(datetime.timezone.utc)
-        logger.info("Finished moving at UTC datetime: {}.".format(dt)) 
+        logger.info("Finished moving at UTC datetime: {}.".format(dt))
     except solys2.SolysException as e:
         dt = datetime.datetime.now(datetime.timezone.utc)
         logger.error("Error at UTC datetime: {}".format(dt))
         logger.error("Error: {}".format(e))
 
-def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
+def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: Lock,
     cont_track: _ContainedBool, logger: logging.Logger, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None):
+    password: str = "solys", is_finished: _ContainedBool = None,
+    altitude: float = 0, kernels_path: str = "./kernels"):
     """
     Track a celestial body
 
@@ -244,8 +183,8 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
         IP of the solys.
     seconds : float
         Amount of seconds waited between each message of change of position of zenith and azimuth.
-    body : _TrackBody
-        Body that will be tracked. Moon or Sun.
+    library : _BodyLibrary
+        Body library that will be used to track the body. Moon or Sun.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
     cont_track : _ContainedBool
@@ -260,6 +199,11 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
 
     Raises
     ------
@@ -269,20 +213,21 @@ def _track_body(ip: str, seconds: float, body: _TrackBody, mutex_cont: Lock,
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
-    get_position, mi_coords = _get_position_function(solys, body, logger)
-    if body == _TrackBody.SUN:
+    body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
+    if library in psc.SunLibrary:
         logger.info("Tracking sun. Connected with Solys2.")
     else:
         logger.info("Tracking moon. Connected with Solys2.")
     # Start tracking in a loop
     sleep_time = 0
+    time_offset = seconds / 2.0
     t0 = time.time()
     mutex_cont.acquire()
     cont_track.value = True
     while cont_track.value:
         mutex_cont.release()
         logger.debug("Waited {} seconds.\n".format(sleep_time))
-        _read_and_move(solys, get_position, mi_coords, logger)
+        _read_and_move(solys, body_calc, logger, datetime_offset = time_offset)
         tf = time.time()
         tdiff = tf - t0
         sleep_time = (seconds - tdiff)
@@ -328,8 +273,9 @@ class CrossParameters:
     zenith_max_offset: float
     zenith_step: float
 
-def _cross_body(ip: str, body: _TrackBody, logger: logging.Logger, cross_params: CrossParameters,
-    port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None):
+def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cross_params: CrossParameters,
+    port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None,
+    datetime_offset: float = 0, altitude: float = 0, kernels_path: str = "./kernels"):
     """
     Perform a cross over a body
 
@@ -337,8 +283,8 @@ def _cross_body(ip: str, body: _TrackBody, logger: logging.Logger, cross_params:
     ----------
     ip : str
         IP of the solys.
-    body : _TrackBody
-        Body that where the cross will be performed on. Moon or Sun.
+    library : _BodyLibrary
+        Body library that will be used to track the body. Moon or Sun.
     logger : logging.Logger
         Logger that will log out the log messages
     cross_params : CrossParameters
@@ -350,12 +296,19 @@ def _cross_body(ip: str, body: _TrackBody, logger: logging.Logger, cross_params:
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
+    datetime_offset : float
+        Offset of seconds that the body positions will be calculated, added to currrent time.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
     """
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
-    get_position, mi_coords = _get_position_function(solys, body, logger)
-    if body == _TrackBody.SUN:
+    body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
+    if library in psc.SunLibrary:
         logger.info("Performing a solar cross. Connected with Solys2.")
     else:
         logger.info("Performing a lunar cross. Connected with Solys2.")
@@ -372,7 +325,7 @@ zenith range [{},{}), steps {}.".format(cp.measure_seconds, cp.azimuth_min_offse
     seconds = cp.measure_seconds
     for offset in offsets:
         logger.debug("Waited {} seconds.\n".format(sleep_time))
-        _read_and_move(solys, get_position, mi_coords, logger, offset)
+        _read_and_move(solys, body_calc, logger, offset, datetime_offset=datetime_offset)
         sleep_time = seconds
         if sleep_time > 0:
             time.sleep(sleep_time)
@@ -382,7 +335,9 @@ zenith range [{},{}), steps {}.".format(cp.measure_seconds, cp.azimuth_min_offse
     logger.info("Tracking stopped and connection closed.")
 
 def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None):
+    password: str = "solys", is_finished: _ContainedBool = None, datetime_offset: float = 0,
+    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM, altitude: float = 0,
+    kernels_path: str = "./kernels"):
     """
     Perform a cross over the Moon
 
@@ -401,11 +356,22 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
+    datetime_offset : float
+        Offset of seconds that the body positions will be calculated, added to currrent time.
+    library : MoonLibrary
+        Lunar library that will be used to track the Moon. By default is ephem.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
     """
-    return _cross_body(ip, _TrackBody.MOON, logger, cross_params, port, password, is_finished)
+    return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
+        datetime_offset, altitude, kernels_path)
 
 def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None):
+    password: str = "solys", is_finished: _ContainedBool = None, datetime_offset: float = 0,
+    library: psc.SunLibrary = psc.SunLibrary.PYSOLAR):
     """
     Perform a cross over the Sun
 
@@ -424,11 +390,18 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
+    datetime_offset : float
+        Offset of seconds that the body positions will be calculated, added to currrent time.
+    library : SunLibrary
+        Solar library that will be used to track the Sun. By default is pysolar.
     """
-    return _cross_body(ip, _TrackBody.SUN, logger, cross_params, port, password, is_finished)
+    return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
+        datetime_offset)
 
 def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None):
+    password: str = "solys", is_finished: _ContainedBool = None,
+    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM, altitude: float = 0,
+    kernels_path: str = "./kernels"):
     """
     Perform a black for the moon. Point to a position where the moon is not present so the noise
     can be calculated.
@@ -449,14 +422,21 @@ def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
+    library : MoonLibrary
+        Lunar library that will be used to track the Moon. By default is ephem.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
     """
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
-    get_position, mi_coords = _get_position_function(solys, _TrackBody.MOON, logger)
+    body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
     logger.info("Performing a lunar black of {} degrees. Connected with Solys2.".format(offset))
 
     dt = datetime.datetime.now(datetime.timezone.utc)
-    az, ze = get_position(mi_coords, dt)
+    az, ze = body_calc.get_position(dt)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
     az_offset = ze_offset = offset
@@ -464,7 +444,7 @@ def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 
         az_offset *= -1
     if ze > 45:
         ze_offset *= -1
-    _read_and_move(solys, get_position, mi_coords, logger, (az_offset, ze_offset))
+    _read_and_move(solys, body_calc, logger, (az_offset, ze_offset))
     dt = datetime.datetime.now(datetime.timezone.utc)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
@@ -512,8 +492,9 @@ class _BodyTracker:
         Container for the boolean value that initially will be False, but it will be True
         when the thread has successfully ended execution.
     """
-    def __init__(self, ip: str, seconds: float, body: _TrackBody, port: int = 15000,
-        password: str = "solys", log: bool = False, logfile: str = ""):
+    def __init__(self, ip: str, seconds: float, library: psc._BodyLibrary, port: int = 15000,
+        password: str = "solys", log: bool = False, logfile: str = "",
+        altitude: float = 0, kernels_path: str = "./kernels"):
         """
         Parameters
         ----------
@@ -522,8 +503,8 @@ class _BodyTracker:
         seconds : float
             Amount of seconds waited between each message of change of position of zenith and
             azimuth.
-        body : _TrackBody
-            Body that will be tracked. Moon or Sun.
+        library : _BodyLibrary
+            Body library that will be used to track the body. Moon or Sun.
         port : int
             Access port. By default 15000.
         password : str
@@ -533,14 +514,19 @@ class _BodyTracker:
         logfile : str
             Path of the file where the logging will be stored. In case that it's not used, it will be
             printed in standard output error.
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
         """
         self.mutex_cont = Lock()
         self.cont_track = _ContainedBool(True)
         self._configure_logger(log, logfile)
         self._is_finished = _ContainedBool(False)
         # Create thread
-        self.thread = Thread(target = _track_body, args = (ip, seconds, body, self.mutex_cont,
-            self.cont_track, self.logger, port, password, self._is_finished))
+        self.thread = Thread(target = _track_body, args = (ip, seconds, library, self.mutex_cont,
+            self.cont_track, self.logger, port, password, self._is_finished, altitude, kernels_path))
         self.thread.start()
     
     def _configure_logger(self, log: bool, logfile: str):
@@ -606,7 +592,8 @@ class MoonTracker(_BodyTracker):
     Solys2 so it tracks the Moon.
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
-        log: bool = False, logfile: str = ""):
+        log: bool = False, logfile: str = "", library: psc.MoonLibrary = psc.MoonLibrary.EPHEM,
+        altitude: float = 0, kernels_path: str = "./kernels"):
         """
         Parameters
         ----------
@@ -624,8 +611,15 @@ class MoonTracker(_BodyTracker):
         logfile : str
             Path of the file where the logging will be stored. In case that it's not used, it will be
             printed in standard output error.
+        library : MoonLibrary
+            Lunar library that will be used to track the Moon. By default is ephem.
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
         """
-        super().__init__(ip, seconds, _TrackBody.MOON, port, password, log, logfile)
+        super().__init__(ip, seconds, library, port, password, log, logfile, altitude, kernels_path)
 
 class SunTracker(_BodyTracker):
     """SunTracker
@@ -633,7 +627,8 @@ class SunTracker(_BodyTracker):
     Solys2 so it tracks the Sun.
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
-        log: bool = False, logfile: str = ""):
+        log: bool = False, logfile: str = "",
+        library: psc.SunLibrary = psc.SunLibrary.PYSOLAR):
         """
         Parameters
         ----------
@@ -651,5 +646,7 @@ class SunTracker(_BodyTracker):
         logfile : str
             Path of the file where the logging will be stored. In case that it's not used, it will be
             printed in standard output error.
+        library : SunLibrary
+            Solar library that will be used to track the Sun. By default is pysolar.
         """
-        super().__init__(ip, seconds, _TrackBody.SUN, port, password, log, logfile)
+        super().__init__(ip, seconds, library, port, password, log, logfile)

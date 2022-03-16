@@ -8,6 +8,7 @@ import logging
 
 from solys2 import solys2 as s2
 from solys2 import autotrack as aut
+from solys2 import positioncalc as psc
 
 TCP_IP = "157.88.43.171"
 TCP_PORT = 15000
@@ -61,26 +62,26 @@ def pruebas_comandos_raw():
     send_command(s, cmd_pwd)
     send_command(s, cmd_prot)
     send_command(s, cmd)
-    send_command(s, "VE")
+    send_command(s, "PO 1 94.9")
     #send_command(s, "PO 1 40")
     s.close()
 
 def prueba_cross():
-    cp = aut.CrossParameters(30, -1.5, 1.501, 0.3, -1.5, 1.501, 0.3)
+    cp = aut.CrossParameters(15, -1.5, 1.501, 0.3, -1.5, 1.501, 0.3)
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger("sandbox")
-    aut._cross_body(TCP_IP, aut._TrackBody.SUN, logger, cp, TCP_PORT, "solys")
+    aut.lunar_cross(TCP_IP, logger, cp, TCP_PORT, "solys", library=psc.MoonLibrary.SPICEDMOON, altitude=2373, kernels_path="./kernels.temp.dir")
 
 def prueba_black():
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger("sandbox")
-    aut.black_moon(TCP_IP, logger, 15)
+    aut.black_moon(TCP_IP, logger, 15, library=psc.MoonLibrary.PYLUNAR)
 
 def prueba_track():
-    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt")
+    st = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.PYLUNAR)
 
 def main():
-    prueba_black()
+    pruebas_comandos_raw()
 
 if __name__ == "__main__":
     main()
