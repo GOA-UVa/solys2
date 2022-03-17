@@ -256,13 +256,13 @@ class CrossParameters:
     azimuth_min_offset : float
         Minimum value of azimuth offset in degrees. Included in the interval.
     azimuth_max_offset : float
-        Maximum value of azimuth offset in degrees. Not included in the interval.
+        Maximum value of azimuth offset in degrees. Included in the interval.
     azimuth_step : float
         Amount of degrees that are between each azimuth cross point.
     zenith_min_offset : float
         Minimum value of zenith offset in degrees. Included in the interval.
     zenith_max_offset : float
-        Maximum value of zenith offset in degrees. Not included in the interval.
+        Maximum value of zenith offset in degrees. Included in the interval.
     zenith_step : float
         Amount of degrees that are between each zenith cross point.
     countdown : float
@@ -318,14 +318,16 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
     else:
         logger.info("Performing a lunar cross. Connected with Solys2.")
     cp = cross_params
-    logger.info("Performing cross with azimuth range [{},{}), steps {}, and zenith range [{},{}),\
+    logger.info("Performing cross with azimuth range [{},{}], steps {}, and zenith range [{},{}],\
 steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_offset,
         cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
         cp.zenith_step, cp.countdown, cp.post_wait))
     # Generating the offsets
     offsets: List[Tuple[float, float]] = \
-        [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset, cp.azimuth_step)]
-    offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset, cp.zenith_step)]
+        [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset + cp.azimuth_step,
+            cp.azimuth_step)]
+    offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset + cp.zenith_step,
+        cp.zenith_step)]
     sleep_time0 = 0
     sleep_time1 = 0
     solys_delay = _SOLYS_APPROX_DELAY + _SOLYS_DELAY_MARGIN

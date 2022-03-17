@@ -82,7 +82,7 @@ def prueba_track():
     st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.EPHEM_SUN)
 
 def main():
-    prueba_cross()
+    prueba_track()
 
 if __name__ == "__main__":
     main()
