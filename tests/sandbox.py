@@ -67,7 +67,7 @@ def pruebas_comandos_raw():
     s.close()
 
 def prueba_cross():
-    cp = aut.CrossParameters(15, -1.5, 1.501, 0.3, -1.5, 1.501, 0.3)
+    cp = aut.CrossParameters(-1.5, 1.501, 0.3, -1.5, 1.501, 0.3, 5, 2)
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger("sandbox")
     aut.lunar_cross(TCP_IP, logger, cp, TCP_PORT, "solys", library=psc.MoonLibrary.SPICEDMOON, altitude=2373, kernels_path="./kernels.temp.dir")
@@ -78,10 +78,11 @@ def prueba_black():
     aut.black_moon(TCP_IP, logger, 15, library=psc.MoonLibrary.PYLUNAR)
 
 def prueba_track():
-    st = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.SPICEDMOON, altitude=710, kernels_path="./kernels.temp.dir")
+    #mt = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.SPICEDMOON, altitude=710, kernels_path="./kernels.temp.dir")
+    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.EPHEM_SUN)
 
 def main():
-    prueba_track()
+    prueba_cross()
 
 if __name__ == "__main__":
     main()

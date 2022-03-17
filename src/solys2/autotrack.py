@@ -36,6 +36,10 @@ __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
 __status__ = "Development"
 
+_SOLYS_APPROX_DELAY = 4.5
+_SOLYS_DELAY_MARGIN = 2
+_ASD_DELAY = 2
+
 class _TrackBody(Enum):
     """
     Enum that represents the celestial body that the Solys will track.
@@ -219,7 +223,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         logger.info("Tracking moon. Connected with Solys2.")
     # Start tracking in a loop
     sleep_time = 0
-    time_offset = seconds / 2.0
+    time_offset = ((seconds - _SOLYS_APPROX_DELAY) / 2.0) + _SOLYS_APPROX_DELAY
     t0 = time.time()
     mutex_cont.acquire()
     cont_track.value = True
@@ -249,8 +253,6 @@ class CrossParameters:
 
     Attributes
     ----------
-    measure_seconds : float
-        Amount of seconds that the Solys2 will wait on each cross point.
     azimuth_min_offset : float
         Minimum value of azimuth offset in degrees. Included in the interval.
     azimuth_max_offset : float
@@ -263,18 +265,24 @@ class CrossParameters:
         Maximum value of zenith offset in degrees. Not included in the interval.
     zenith_step : float
         Amount of degrees that are between each zenith cross point.
+    countdown : float
+        Amount of seconds that the Solys2 will wait before the ASD is calculated, logging
+        a countdown.
+    post_wait : float
+        Amount of seconds that the Solys2 will wait after the ASD has been calculated.
     """
-    measure_seconds: float
     azimuth_min_offset: float
     azimuth_max_offset: float
     azimuth_step: float
     zenith_min_offset: float
     zenith_max_offset: float
     zenith_step: float
+    countdown: float
+    post_wait: float
 
 def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cross_params: CrossParameters,
     port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None,
-    datetime_offset: float = 0, altitude: float = 0, kernels_path: str = "./kernels"):
+    altitude: float = 0, kernels_path: str = "./kernels"):
     """
     Perform a cross over a body
 
@@ -295,8 +303,6 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
-    datetime_offset : float
-        Offset of seconds that the body positions will be calculated, added to currrent time.
     altitude : float
         Altitude in meters of the observer point. Used only if SPICE library is selected.
     kernels_path : str
@@ -312,29 +318,43 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
     else:
         logger.info("Performing a lunar cross. Connected with Solys2.")
     cp = cross_params
-    logger.info("Performing cross waiting {} seconds, with azimuth range [{},{}), steps {}, and \
-zenith range [{},{}), steps {}.".format(cp.measure_seconds, cp.azimuth_min_offset,
+    logger.info("Performing cross with azimuth range [{},{}), steps {}, and zenith range [{},{}),\
+steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_offset,
         cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
-        cp.zenith_step))
+        cp.zenith_step, cp.countdown, cp.post_wait))
     # Generating the offsets
     offsets: List[Tuple[float, float]] = \
         [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset, cp.azimuth_step)]
     offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset, cp.zenith_step)]
-    sleep_time = 0
-    seconds = cp.measure_seconds
+    sleep_time0 = 0
+    sleep_time1 = 0
+    solys_delay = _SOLYS_APPROX_DELAY + _SOLYS_DELAY_MARGIN
+    dt_offset = cp.countdown + _ASD_DELAY/2.0 + solys_delay
     for offset in offsets:
-        logger.debug("Waited {} seconds.\n".format(sleep_time))
-        _read_and_move(solys, body_calc, logger, offset, datetime_offset=datetime_offset)
-        sleep_time = seconds
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+        logger.debug("Waited {} seconds.\n".format(sleep_time0 + sleep_time1))
+        dt0 = datetime.datetime.now(datetime.timezone.utc)
+        _read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
+        sleep_time0 = cp.countdown
+        dtf = datetime.datetime.now(datetime.timezone.utc)
+        diff_td = dtf - dt0
+        wait_time = (dt_offset - _ASD_DELAY/2.0) - (diff_td.total_seconds() + sleep_time0)
+        if wait_time > 0:
+            logger.debug("Sleeping {} seconds".format(wait_time))
+            time.sleep(wait_time)
+        for i in range(sleep_time0):
+            logger.warn("COUNTDOWN:{}".format(sleep_time0-i))
+            time.sleep(1)
+        logger.warn("COUNTDOWN:0")
+        sleep_time1 = cp.post_wait
+        if sleep_time1 > 0:
+            time.sleep(sleep_time1)
     solys.close()
     if is_finished:
         is_finished.value = True
     logger.info("Tracking stopped and connection closed.")
 
 def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None, datetime_offset: float = 0,
+    password: str = "solys", is_finished: _ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels"):
     """
@@ -355,8 +375,6 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
-    datetime_offset : float
-        Offset of seconds that the body positions will be calculated, added to currrent time.
     library : MoonLibrary
         Lunar library that will be used to track the Moon. By default is ephem.
     altitude : float
@@ -366,10 +384,10 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
         is selected.
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        datetime_offset, altitude, kernels_path)
+        altitude, kernels_path)
 
 def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None, datetime_offset: float = 0,
+    password: str = "solys", is_finished: _ContainedBool = None,
     library: psc.SunLibrary = psc.SunLibrary.PYSOLAR):
     """
     Perform a cross over the Sun
@@ -389,13 +407,10 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     is_finished : _ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
-    datetime_offset : float
-        Offset of seconds that the body positions will be calculated, added to currrent time.
     library : SunLibrary
         Solar library that will be used to track the Sun. By default is pysolar.
     """
-    return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        datetime_offset)
+    return _cross_body(ip, library, logger, cross_params, port, password, is_finished)
 
 def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
