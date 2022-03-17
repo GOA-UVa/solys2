@@ -412,13 +412,13 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished)
 
-def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 15000,
+def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels"):
     """
     Perform a black for the moon. Point to a position where the moon is not present so the noise
-    can be calculated.
+    can be calculated. (Opposite azimuth and zenith = 45)
 
     Parameters
     ----------
@@ -426,9 +426,6 @@ def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 
         IP of the solys.
     logger : logging.Logger
         Logger that will log out the log messages
-    offset : float
-        Amount of degrees that will differ from the lunar position when this function is executed.
-        By default is 15.
     port : int
         Access port. By default 15000.
     password : str
@@ -447,17 +444,17 @@ def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
     body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
-    logger.info("Performing a lunar black of {} degrees. Connected with Solys2.".format(offset))
 
     dt = datetime.datetime.now(datetime.timezone.utc)
     az, ze = body_calc.get_position(dt)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
-    az_offset = ze_offset = offset
+    az_offset = 180
     if az > 180:
         az_offset *= -1
-    if ze > 45:
-        ze_offset *= -1
+    ze_offset = 45-ze
+    logger.info("Performing a lunar black of ({},{}) degrees. Connected with Solys2.".format(
+        az_offset, ze_offset))
     _read_and_move(solys, body_calc, logger, (az_offset, ze_offset))
     dt = datetime.datetime.now(datetime.timezone.utc)
     prev_az, prev_ze, _ = solys.get_current_position()
