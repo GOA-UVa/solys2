@@ -36,7 +36,7 @@ __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
 __status__ = "Development"
 
-_SOLYS_APPROX_DELAY = 4.5
+_SOLYS_APPROX_DELAY = 5
 _SOLYS_DELAY_MARGIN = 2
 _ASD_DELAY = 2
 
@@ -330,8 +330,11 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
     sleep_time1 = 0
     solys_delay = _SOLYS_APPROX_DELAY + _SOLYS_DELAY_MARGIN
     dt_offset = cp.countdown + _ASD_DELAY/2.0 + solys_delay
+    logger.debug("Moving next to the body...")
+    _read_and_move(solys, body_calc, logger, (0,0))
+    logger.debug("Moved next to the body.")
+    logger.info("Starting cross")
     for offset in offsets:
-        logger.debug("Waited {} seconds.\n".format(sleep_time0 + sleep_time1))
         dt0 = datetime.datetime.now(datetime.timezone.utc)
         _read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
         sleep_time0 = cp.countdown
@@ -346,6 +349,7 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
             time.sleep(1)
         logger.warn("COUNTDOWN:0")
         sleep_time1 = cp.post_wait
+        logger.debug("Waiting {} seconds (post).".format(sleep_time1))
         if sleep_time1 > 0:
             time.sleep(sleep_time1)
     solys.close()
