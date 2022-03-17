@@ -80,18 +80,20 @@ class BodyCalculator(ABC):
         pass
 
 class _BodyLibrary(Enum):
-    EPHEM = 0
+    EPHEM_MOON = 0
     SPICEDMOON = 1
     PYLUNAR = 2
     PYSOLAR = 100
+    EPHEM_SUN = 101
 
 class MoonLibrary(Enum):
-    EPHEM = 0
+    EPHEM_MOON = 0
     SPICEDMOON = 1
     PYLUNAR = 2
 
 class SunLibrary(Enum):
     PYSOLAR = 100
+    EPHEM_SUN = 101
 
 class MoonCalculator(BodyCalculator):
     """
@@ -282,4 +284,40 @@ class PysolarSunCalc(SunCalculator):
         lat, lon = self.lat, self.lon
         az = solar.get_azimuth(lat, lon, dt)
         ze = 90 - solar.get_altitude(lat, lon, dt)
+        return az, ze
+
+class EphemSunCalc(SunCalculator):
+    """
+    Object that calculates the solar zenith and azimuth for a given location
+    at a given datetime, using ephem library.
+    """
+
+    def __init__(self, lat: float, lon: float):
+        self.lat = lat
+        self.lon = lon
+        self.obs = ephem.Observer()
+        self.obs.lat = math.radians(lat)
+        self.obs.long = math.radians(lon)
+        self.s = ephem.Sun()
+
+    def get_position(self, dt: datetime) -> Tuple[float, float]:
+        """
+        Obtain solar azimuth and zenith.
+
+        Parameters
+        ----------
+        dt : datetime.datetime
+            Datetime at which the solar position will be calculated.
+
+        Returns
+        -------
+        azimuth : float
+            Solar azimuth calculated.
+        zenith : float
+            Solar zenith calculated.
+        """
+        self.obs.date = dt
+        self.s.compute(self.obs)
+        az = math.degrees(self.s.az)
+        ze = 90 - math.degrees(self.s.alt)
         return az, ze

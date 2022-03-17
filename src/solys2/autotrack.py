@@ -12,7 +12,7 @@ It exports the following classes:
 """___Built-In Modules___"""
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Tuple, List, ClassVar
+from typing import Dict, Tuple, List
 import time
 import datetime
 import logging
@@ -21,8 +21,6 @@ import string
 import random
 
 """___Third-Party Modules___"""
-import pylunar
-from pysolar import solar
 import numpy as np
 
 """___Solys2 Modules___"""
@@ -85,10 +83,11 @@ def _get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger
         else:
             logger.error("ERROR obtaining coordinates. Unknown error.")
     switcher: Dict[int, psc.BodyCalculator] = {
-        psc._BodyLibrary.EPHEM.value: psc.EphemMoonCalc,
+        psc._BodyLibrary.EPHEM_MOON.value: psc.EphemMoonCalc,
         psc._BodyLibrary.SPICEDMOON.value: psc.SpiceMoonCalc,
         psc._BodyLibrary.PYLUNAR.value: psc.PylunarMoonCalc,
-        psc._BodyLibrary.PYSOLAR.value: psc.PysolarSunCalc
+        psc._BodyLibrary.PYSOLAR.value: psc.PysolarSunCalc,
+        psc._BodyLibrary.EPHEM_SUN.value: psc.EphemSunCalc
     }
     body_calc_class = switcher[library.value]
     if library.value == psc._BodyLibrary.SPICEDMOON.value:
@@ -214,7 +213,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
     body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
-    if library in psc.SunLibrary:
+    if library.value in [l.value for l in psc.SunLibrary]:
         logger.info("Tracking sun. Connected with Solys2.")
     else:
         logger.info("Tracking moon. Connected with Solys2.")
@@ -336,7 +335,7 @@ zenith range [{},{}), steps {}.".format(cp.measure_seconds, cp.azimuth_min_offse
 
 def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None, datetime_offset: float = 0,
-    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM, altitude: float = 0,
+    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels"):
     """
     Perform a cross over the Moon
@@ -400,7 +399,7 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
 
 def black_moon(ip: str, logger: logging.Logger, offset: float = 15, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
-    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM, altitude: float = 0,
+    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels"):
     """
     Perform a black for the moon. Point to a position where the moon is not present so the noise
@@ -592,7 +591,7 @@ class MoonTracker(_BodyTracker):
     Solys2 so it tracks the Moon.
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
-        log: bool = False, logfile: str = "", library: psc.MoonLibrary = psc.MoonLibrary.EPHEM,
+        log: bool = False, logfile: str = "", library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
         altitude: float = 0, kernels_path: str = "./kernels"):
         """
         Parameters

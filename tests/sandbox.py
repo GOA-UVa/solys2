@@ -78,10 +78,10 @@ def prueba_black():
     aut.black_moon(TCP_IP, logger, 15, library=psc.MoonLibrary.PYLUNAR)
 
 def prueba_track():
-    st = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.PYLUNAR)
+    st = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.SPICEDMOON, altitude=710, kernels_path="./kernels.temp.dir")
 
 def main():
-    pruebas_comandos_raw()
+    prueba_track()
 
 if __name__ == "__main__":
     main()
