@@ -23,7 +23,7 @@ import spicedsun
 
 """___Authorship___"""
 __author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
-Roberto Román, Carlos Toledano'
+Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/03/16"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
