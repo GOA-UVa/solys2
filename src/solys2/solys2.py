@@ -886,8 +886,8 @@ class Solys2:
             return dt, output
         tf = time.time()
         t_extra = (tf-t0)/2
-        dt = datetime.datetime(nums[0], 1, 1, nums[2], nums[3], nums[4],
-            tzinfo=datetime.timezone.utc) + datetime.timedelta(nums[1]-1, t_extra)
+        dt = datetime.datetime(int(nums[0]), 1, 1, int(nums[2]), int(nums[3]), int(nums[4]),
+            tzinfo=datetime.timezone.utc) + datetime.timedelta(int(nums[1])-1, t_extra)
         return dt, output
     
     def _calculate_timedelta(self) -> Tuple[datetime.timedelta, CommandOutput]:
