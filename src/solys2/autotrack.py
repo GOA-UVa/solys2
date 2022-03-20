@@ -149,14 +149,14 @@ def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: 
     datetime_offset : float
         Offset of seconds that the body positions will be calculated, added to currrent time.
     """
-    dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
+    dt = solys.now()
     logger.info("UTC Datetime: {}.".format(dt))
     try:
         prev_az, prev_ze, _ = solys.get_current_position()
         qsi, total_intens, _ = solys.get_sun_intensity()
         logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
         logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-        dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
+        dt = solys.now()
         logger.info("Real UTC Datetime: {}".format(dt))
         dt = dt + datetime.timedelta(0, datetime_offset)
         logger.info("Position UTC Datetime: {}".format(dt))
@@ -168,10 +168,10 @@ def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: 
         logger.info("Sent positions: Azimuth: {} + {} ({}). Zenith: {} + {} ({}).\n".format(az,
             offset[0], new_az, ze, offset[1], new_ze))
         _wait_position_reached(solys, new_az, new_ze, logger)
-        dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
+        dt = solys.now()
         logger.info("Finished moving at UTC datetime: {}.".format(dt))
     except solys2.SolysException as e:
-        dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
+        dt = solys.now()
         logger.error("Error at UTC datetime: {}".format(dt))
         logger.error("Error: {}".format(e))
 
@@ -460,7 +460,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     solys.set_power_save(False)
     body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
 
-    dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
+    dt = solys.now()
     az, ze = body_calc.get_position(dt)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
@@ -471,7 +471,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     logger.info("Performing a lunar black of ({},{}) degrees. Connected with Solys2.".format(
         az_offset, ze_offset))
     _read_and_move(solys, body_calc, logger, (az_offset, ze_offset))
-    dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
+    dt = solys.now()
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
     logger.info("UTC Datetime: {}".format(dt))

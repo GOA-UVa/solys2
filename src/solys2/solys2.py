@@ -927,6 +927,17 @@ class Solys2:
         """
         self.timedelta, out = self._calculate_timedelta()
         return out
+    
+    def now(self) -> datetime.datetime:
+        """
+        Calculates the current Solys2 internal datetime without sending a TCP message.
+
+        Returns
+        -------
+        dt : datetime.datetime
+            Estimated Solys2 internal time.
+        """
+        return datetime.datetime.now(datetime.timezone.utc) + self.timedelta
 
 def translate_error(code: str) -> str:
     """
