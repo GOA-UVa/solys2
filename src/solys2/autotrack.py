@@ -58,11 +58,6 @@ class _ContainedBool:
     """
     value : bool
 
-def _get_solys2_timedelta(solys: solys2.Solys2) -> datetime.timedelta:
-    solys_dt = solys.get_datetime()[0]
-    pc_dt = datetime.datetime.now(datetime.timezone.utc)
-    return solys_dt - pc_dt
-
 def _get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger: logging.Logger,
     altitude: float = 0, kernels_path: str = "./kernels") -> psc.BodyCalculator:
     """
@@ -154,14 +149,14 @@ def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: 
     datetime_offset : float
         Offset of seconds that the body positions will be calculated, added to currrent time.
     """
-    dt = datetime.datetime.now(datetime.timezone.utc)
+    dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
     logger.info("UTC Datetime: {}.".format(dt))
     try:
         prev_az, prev_ze, _ = solys.get_current_position()
         qsi, total_intens, _ = solys.get_sun_intensity()
         logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
         logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-        dt = datetime.datetime.now(datetime.timezone.utc)
+        dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
         logger.info("Real UTC Datetime: {}".format(dt))
         dt = dt + datetime.timedelta(0, datetime_offset)
         logger.info("Position UTC Datetime: {}".format(dt))
@@ -173,10 +168,10 @@ def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: 
         logger.info("Sent positions: Azimuth: {} + {} ({}). Zenith: {} + {} ({}).\n".format(az,
             offset[0], new_az, ze, offset[1], new_ze))
         _wait_position_reached(solys, new_az, new_ze, logger)
-        dt = datetime.datetime.now(datetime.timezone.utc)
+        dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
         logger.info("Finished moving at UTC datetime: {}.".format(dt))
     except solys2.SolysException as e:
-        dt = datetime.datetime.now(datetime.timezone.utc)
+        dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
         logger.error("Error at UTC datetime: {}".format(dt))
         logger.error("Error: {}".format(e))
 
@@ -344,12 +339,12 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
     logger.debug("Moved next to the body.")
     logger.info("Starting cross")
     for offset in offsets:
-        dt0 = datetime.datetime.now(datetime.timezone.utc)
+        t0 = time.time()
         _read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
         sleep_time0 = cp.countdown
-        dtf = datetime.datetime.now(datetime.timezone.utc)
-        diff_td = dtf - dt0
-        wait_time = (dt_offset - _ASD_DELAY/2.0) - (diff_td.total_seconds() + sleep_time0)
+        tf = time.time()
+        diff_td = tf - t0
+        wait_time = (dt_offset - _ASD_DELAY/2.0) - (diff_td + sleep_time0)
         if wait_time > 0:
             logger.debug("Sleeping {} seconds".format(wait_time))
             time.sleep(wait_time)
@@ -465,7 +460,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     solys.set_power_save(False)
     body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
 
-    dt = datetime.datetime.now(datetime.timezone.utc)
+    dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
     az, ze = body_calc.get_position(dt)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
@@ -476,7 +471,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     logger.info("Performing a lunar black of ({},{}) degrees. Connected with Solys2.".format(
         az_offset, ze_offset))
     _read_and_move(solys, body_calc, logger, (az_offset, ze_offset))
-    dt = datetime.datetime.now(datetime.timezone.utc)
+    dt = datetime.datetime.now(datetime.timezone.utc) + solys.timedelta
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
     logger.info("UTC Datetime: {}".format(dt))

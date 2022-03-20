@@ -125,6 +125,9 @@ class Solys2:
         Boolean value that stores if the connection is closed or not.
     offset_cp : list of float
         Adjustments of the motors. [adjustment_0, adjustment_1].
+    timedelta : datetime.timedelta
+        Difference between solys internal time (UTC) and the Computer time in UTC.
+        pc_time + timedelta = solys_time
     """
 
     def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
@@ -154,6 +157,7 @@ class Solys2:
 
         self.adjust()
         self.version()
+        self.update_timedelta()
 
     def connect(self):
         """
@@ -763,7 +767,7 @@ class Solys2:
         raw_status = output.raw_response.replace("IS ", "", 1)
         return raw_status, output
 
-    def get_status(self):
+    def get_status(self) -> Tuple[str, List[str], List[str], CommandOutput]:
         """
         Gets the status, translated for humans.
 
@@ -871,8 +875,8 @@ class Solys2:
         -------
         dt : datetime.datetime
             Solys2 internal time.
-        outputs : list of CommandOutput
-            Output of the commands, data received from solys.
+        output : CommandOutput
+            Output of the command, data received from solys.
         """
         t0 = time.time()
         output = self.send_command("TI")
@@ -885,6 +889,44 @@ class Solys2:
         dt = datetime.datetime(nums[0], 1, 1, nums[2], nums[3], nums[4],
             tzinfo=datetime.timezone.utc) + datetime.timedelta(nums[1]-1, t_extra)
         return dt, output
+    
+    def _calculate_timedelta(self) -> Tuple[datetime.timedelta, CommandOutput]:
+        """
+        Calculate the difference between solys internal time (UTC) and the Computer
+        time in UTC.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        tdt : datetime.timedelta
+            Difference between solys internal time (UTC) and the Computer time in UTC.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        solys_dt, out = self.get_datetime()
+        pc_dt = datetime.datetime.now(datetime.timezone.utc)
+        return (solys_dt - pc_dt), out
+    
+    def update_timedelta(self) -> CommandOutput:
+        """
+        Updates the inner timedelta parameter, calculating it.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        self.timedelta, out = self._calculate_timedelta()
+        return out
 
 def translate_error(code: str) -> str:
     """
