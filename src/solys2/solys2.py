@@ -16,6 +16,7 @@ It exports the following functions:
 
 """___Built-In Modules___"""
 from dataclasses import dataclass
+import datetime
 from enum import Enum
 from typing import Tuple, List
 import time
@@ -752,6 +753,34 @@ class Solys2:
             Output of the commands, data received from solys.
         """
         return self._set_function_with_home(SolysFunction.STANDARD_OPERATION)
+    
+    def get_datetime(self) -> Tuple[datetime.datetime, CommandOutput]:
+        """Get Time (TI)
+        Retrieve the internal time (Universal).
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        dt : datetime.datetime
+            Solys2 internal time.
+        outputs : list of CommandOutput
+            Output of the commands, data received from solys.
+        """
+        t0 = time.time()
+        output = self.send_command("TI")
+        nums = output.nums
+        if len(nums) != 5:
+            dt = datetime.datetime(0, 0, 0)
+            return dt, output
+        tf = time.time()
+        t_extra = (tf-t0)/2
+        dt = datetime.datetime(nums[0], 1, 1, nums[2], nums[3], nums[4],
+            tzinfo=datetime.timezone.utc) + datetime.timedelta(nums[1]-1, t_extra)
+        return dt, output
 
 def translate_error(code: str) -> str:
     """

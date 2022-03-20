@@ -58,6 +58,11 @@ class _ContainedBool:
     """
     value : bool
 
+def _get_solys2_timedelta(solys: solys2.Solys2) -> datetime.timedelta:
+    solys_dt = solys.get_datetime()[0]
+    pc_dt = datetime.datetime.now(datetime.timezone.utc)
+    return solys_dt - pc_dt
+
 def _get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger: logging.Logger,
     altitude: float = 0, kernels_path: str = "./kernels") -> psc.BodyCalculator:
     """
