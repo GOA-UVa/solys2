@@ -30,7 +30,7 @@ from . import connection
 
 """___Authorship___"""
 __author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
-Roberto Román, Carlos Toledano'
+Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/03/09"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
@@ -302,7 +302,7 @@ class Solys2:
         self.offset_cp = output.nums
         return output.nums[0], output.nums[1], output
 
-    def adjust_motor_0(self, degrees: float) -> CommandOutput:
+    def _adjust_motor_0(self, degrees: float) -> CommandOutput:
         """Adjust motor 0 (AD 0)
         
         Cause the physical <motor> position to be <relative position> further clockwise while the
@@ -320,6 +320,11 @@ class Solys2:
         ----------
         degrees : float
             Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
         """
         cmd = 'AD 0 {}'.format(degrees)
         output = self.send_command(cmd)
@@ -328,7 +333,7 @@ class Solys2:
             self.adjust()
         return output
 
-    def adjust_motor_1(self, degrees: float) -> CommandOutput:
+    def _adjust_motor_1(self, degrees: float) -> CommandOutput:
         """Adjust motor 1 (AD 1)
         
         Cause the physical <motor> position to be <relative position> further clockwise while the
@@ -346,6 +351,11 @@ class Solys2:
         ----------
         degrees : float
             Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
         """
         cmd = 'AD 1 {}'.format(degrees)
         output = self.send_command(cmd)
@@ -353,6 +363,54 @@ class Solys2:
                 output.out == response.OutCode.ANSWERED_VALUE_ERROR:
             self.adjust()
         return output
+    
+    def adjust_azimuth(self, degrees: float) -> CommandOutput:
+        """Adjust the azimuth motor.
+
+        Cause the azimuth motor to be adjusted by the given degrees. The <degrees> parameters
+        must be within [-0.2, 0.2] and the total adjustment must not exceed 4.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Parameters
+        ----------
+        degrees : float
+            Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        degrees = max(-0.2, min(0.2, degrees))
+        return self._adjust_motor_0(degrees)
+    
+    def adjust_zenith(self, degrees: float) -> CommandOutput:
+        """Adjust the zenith motor.
+
+        Cause the zenith motor to be adjusted by the given degrees. The <degrees> parameters
+        must be within [-0.2, 0.2] and the total adjustment must not exceed 4.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Parameters
+        ----------
+        degrees : float
+            Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        degrees = max(-0.2, min(0.2, degrees))
+        return self._adjust_motor_1(degrees)
 
     def version(self) -> CommandOutput:
         """Version (VE)
@@ -685,6 +743,52 @@ class Solys2:
         total_intensity = output.nums[4]
         return intensities, total_intensity, output
     
+    def get_raw_status(self) -> Tuple[str, CommandOutput]:
+        """Status (IS)
+        Get the raw status code returned from the Solys2
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        raw_status : str
+            Raw status code received from the Solys2.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("IS")
+        raw_status = output.raw_response.replace("IS ", "", 1)
+        return raw_status, output
+
+    def get_status(self):
+        """
+        Gets the status, translated for humans.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        ins_stat : str
+            Instrument status.
+        flags_true : list of str
+            List of all the activated flags.
+        flags_false : list of str
+            List of all the deactivated flags.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        raw_status, output = self.get_raw_status()
+        if output.out == response.OutCode.ERROR or output.out == response.OutCode.NONE:
+            return "Error communicating with the Solys2, couldn't retrieve status", [], [], output
+        ins_stat, flags_true, flags_false = response.translate_status(raw_status)
+        return ins_stat, flags_true, flags_false, output
+
     def _set_function_with_home(self, func: SolysFunction) -> List[CommandOutput]:
         """
         Set a tracking function, send the home function and mantain the motor adjustment.
@@ -708,8 +812,8 @@ class Solys2:
         o1 = self.home()
         offset0 = self.offset_cp[0]
         offset1 = self.offset_cp[1]
-        o2 = self.adjust_motor_0(offset0)
-        o3 = self.adjust_motor_1(offset1)
+        o2 = self._adjust_motor_0(offset0)
+        o3 = self._adjust_motor_1(offset1)
         return [o0, o1, o2, o3]
 
     def set_automatic(self) -> List[CommandOutput]:

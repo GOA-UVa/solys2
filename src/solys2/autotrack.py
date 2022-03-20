@@ -30,7 +30,7 @@ from . import positioncalc as psc
 
 """___Authorship___"""
 __author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
-Roberto Román, Carlos Toledano'
+Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/03/10"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
@@ -96,13 +96,15 @@ def _get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger
         psc._BodyLibrary.SPICEDMOON.value: psc.SpiceMoonCalc,
         psc._BodyLibrary.PYLUNAR.value: psc.PylunarMoonCalc,
         psc._BodyLibrary.PYSOLAR.value: psc.PysolarSunCalc,
-        psc._BodyLibrary.EPHEM_SUN.value: psc.EphemSunCalc
+        psc._BodyLibrary.EPHEM_SUN.value: psc.EphemSunCalc,
+        psc._BodyLibrary.SPICEDSUN.value: psc.SpiceSunCalc
     }
     body_calc_class = switcher[library.value]
-    if library.value == psc._BodyLibrary.SPICEDMOON.value:
-        logger.debug("Using spicedmoon library.")
-        return body_calc_class(lat, lon, altitude, kernels_path)
     logger.debug("Using {} library.".format(library.name))
+    if library.value == psc._BodyLibrary.SPICEDMOON.value or \
+        library.value == psc._BodyLibrary.SPICEDSUN.value:
+        logger.debug("Using SPICE.")
+        return body_calc_class(lat, lon, altitude, kernels_path)
     return body_calc_class(lat, lon)
 
 def _wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: logging.Logger):
@@ -399,7 +401,8 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
 
 def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
-    library: psc.SunLibrary = psc.SunLibrary.PYSOLAR):
+    library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
+    kernels_path: str = "./kernels"):
     """
     Perform a cross over the Sun
 
@@ -420,8 +423,14 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
         to True when exiting the function.
     library : SunLibrary
         Solar library that will be used to track the Sun. By default is pysolar.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
     """
-    return _cross_body(ip, library, logger, cross_params, port, password, is_finished)
+    return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
+        altitude, kernels_path)
 
 def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
@@ -649,8 +658,8 @@ class SunTracker(_BodyTracker):
     Solys2 so it tracks the Sun.
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
-        log: bool = False, logfile: str = "",
-        library: psc.SunLibrary = psc.SunLibrary.PYSOLAR):
+        log: bool = False, logfile: str = "", library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
+        altitude: float = 0, kernels_path: str = "./kernels"):
         """
         Parameters
         ----------
@@ -670,5 +679,10 @@ class SunTracker(_BodyTracker):
             printed in standard output error.
         library : SunLibrary
             Solar library that will be used to track the Sun. By default is pysolar.
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
         """
-        super().__init__(ip, seconds, library, port, password, log, logfile)
+        super().__init__(ip, seconds, library, port, password, log, logfile, altitude, kernels_path)

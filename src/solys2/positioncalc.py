@@ -16,13 +16,14 @@ import pylunar
 from pysolar import solar
 import ephem
 import spicedmoon
+import spicedsun
 
 """___Solys2 Modules___"""
 # import here
 
 """___Authorship___"""
 __author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
-Roberto Román, Carlos Toledano'
+Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/03/16"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
@@ -85,6 +86,7 @@ class _BodyLibrary(Enum):
     PYLUNAR = 2
     PYSOLAR = 100
     EPHEM_SUN = 101
+    SPICEDSUN = 102
 
 class MoonLibrary(Enum):
     EPHEM_MOON = 0
@@ -94,6 +96,7 @@ class MoonLibrary(Enum):
 class SunLibrary(Enum):
     PYSOLAR = 100
     EPHEM_SUN = 101
+    SPICEDSUN = 102
 
 class MoonCalculator(BodyCalculator):
     """
@@ -320,4 +323,38 @@ class EphemSunCalc(SunCalculator):
         self.s.compute(self.obs)
         az = math.degrees(self.s.az)
         ze = 90 - math.degrees(self.s.alt)
+        return az, ze
+
+class SpiceSunCalc(SunCalculator):
+    """
+    Object that calculates the solar zenith and azimuth for a given location
+    at a given datetime, using spicedmoon (SPICE) library.
+    """
+
+    def __init__(self, lat: float, lon: float, alt: float = 0, kernels = "./kernels"):
+        self.lat = lat
+        self.lon = lon
+        self.alt = alt
+        self.kernels = kernels
+
+    def get_position(self, dt: datetime) -> Tuple[float, float]:
+        """
+        Obtain solar azimuth and zenith.
+
+        Parameters
+        ----------
+        dt : datetime.datetime
+            Datetime at which the solar position will be calculated.
+
+        Returns
+        -------
+        azimuth : float
+            Solar azimuth calculated.
+        zenith : float
+            Solar zenith calculated.
+        """
+        dts_str = [dt.strftime('%Y-%m-%d %H:%M:%S')]
+        mds = spicedsun.get_sun_datas(self.lat, self.lon, self.alt, dts_str, self.kernels)
+        az = mds[0].azimuth
+        ze = mds[0].zenith
         return az, ze

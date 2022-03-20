@@ -5,6 +5,10 @@ Module that contains functionalities for processing the Solys2 responses.
 It exports the following variables:
     * ERROR_CODES : A dictionary containing all the error codes (and custom ones) with their
         related error messages.
+    * INSTRUMENT_STATUS : A dictionary containing all instrument status related to the
+        instrument status code.
+    * FLAGS_STATUS : A dictionary containing all flags related to the instrument status
+        code.
 
 It exports the following classes:
     * ErrorCode : Enum that contains all possible Solys2 error codes and some custom ones.
@@ -12,12 +16,13 @@ It exports the following classes:
 
 It exports the following functions:
     * process_response : Process the response given by the Solys2.
+    * translate_status : Translate an status code to the corresponding human words.
 """
 
 """___Built-In Modules___"""
 from enum import Enum
 import re
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Dict
 
 """___Third-Party Modules___"""
 # import here
@@ -27,7 +32,7 @@ from typing import Union, Tuple, List
 
 """___Authorship___"""
 __author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
-Roberto Román, Carlos Toledano'
+Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/03/09"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
@@ -173,3 +178,84 @@ def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[flo
         out_code = OutCode.NONE
         numbers = [-1]
     return numbers, out_code, err_code
+
+INSTRUMENT_STATUS: Dict[int, str] = {
+    2: "encoders disabled",
+    3: "getting encoder offsets failed",
+    4: "failed to find ref sensors",
+    5: "ref sensor tests failed",
+    6: "slipped",
+    7: "not functioning (e.g. FU set illegal)",
+    10: "waiting for certain conditions to be met before proceeding (temperature, no motor alarm, LL command)",
+    11: "in process of stopping prior to entering next state",
+    15: "resetting, requesting encoder offsets",
+    16: "resetting, getting encoder offsets",
+    19: "resetting, moving to reset position",
+    20: "resetting, waiting till reset position reached",
+    21: "resetting, testing sensors",
+    22: "resetting, moving towards ref sensors",
+    23: "resetting, globally finding ref sensors",
+    24: "resetting, accurately finding ref sensors",
+    25: "resetting, accepting reset",
+    26: "resetting, waiting in ref and moving over travel range",
+    27: "resetting, preparing for selected function (FU)",
+    28: "resetting, preparing for selected function (FU, at home)",
+    29: "resetting, preparing for selected function (FU, no default circle)",
+    40: "accepting motion commands (not operating autonomously)",
+    50: "calculating sun position and pointing at sun, if possible (clear)",
+    51: "calculating sun position and pointing at sun, if possible (waiting)",
+    52: "calculating sun position and pointing at sun, if possible (tracking)",
+    53: "calculating sun position and pointing at sun, if possible (rewinding)",
+    255: "undefined"
+}
+
+FLAGS_STATUS: Dict[int, str] = {
+    8: "searching for ref",
+    9: "operating autonomously",
+#    10: "unused",
+    11: "valid GPS position",
+    12: "valid GPS altitude",
+    13: "system time synchronized",
+    14: "using sun sensor",
+    15: "fan on",
+    16: "adjustment ok"
+}
+
+def translate_status(raw_status: str) -> Tuple[str, List[str], List[str]]:
+    """
+    Translate an status code to the corresponding human words.
+
+    Parameters
+    ----------
+    raw_status : str
+        Raw status code received from the Solys2
+
+    Returns
+    -------
+    ins_stat : str
+        Instrument status.
+    flags_true : list of str
+        List of all the activated flags.
+    flags_false : list of str
+        List of all the deactivated flags.
+    """
+    try:
+        status_num = int(raw_status, base=16)
+    except ValueError:
+        return "error reading status: {}".format(raw_status), [], []
+    instrument_status_num = status_num%256
+    if instrument_status_num in INSTRUMENT_STATUS:
+        ins_stat = INSTRUMENT_STATUS[instrument_status_num]
+    else:
+        ins_stat = "undefined"
+    bit_status = bin(int(status_num/256))
+    rem_bits = 8
+    blen = len(bit_status)
+    flags_true = []
+    flags_false = []
+    for key in FLAGS_STATUS:
+        if bit_status[blen -(1 + key) + rem_bits] == '1':
+            flags_true.append(FLAGS_STATUS[key])
+        else:
+            flags_false.append(FLAGS_STATUS[key])
+    return ins_stat, flags_true, flags_false
