@@ -125,9 +125,6 @@ class Solys2:
         Boolean value that stores if the connection is closed or not.
     offset_cp : list of float
         Adjustments of the motors. [adjustment_0, adjustment_1].
-    timedelta : datetime.timedelta
-        Difference between solys internal time (UTC) and the Computer time in UTC.
-        pc_time + timedelta = solys_time
     """
 
     def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
@@ -157,7 +154,6 @@ class Solys2:
 
         self.adjust()
         self.version()
-        self.update_timedelta()
 
     def connect(self):
         """
@@ -890,7 +886,7 @@ class Solys2:
             tzinfo=datetime.timezone.utc) + datetime.timedelta(int(nums[1])-1, t_extra)
         return dt, output
     
-    def _calculate_timedelta(self) -> Tuple[datetime.timedelta, CommandOutput]:
+    def calculate_timedelta(self) -> Tuple[datetime.timedelta, CommandOutput]:
         """
         Calculate the difference between solys internal time (UTC) and the Computer
         time in UTC.
@@ -910,34 +906,6 @@ class Solys2:
         solys_dt, out = self.get_datetime()
         pc_dt = datetime.datetime.now(datetime.timezone.utc)
         return (solys_dt - pc_dt), out
-    
-    def update_timedelta(self) -> CommandOutput:
-        """
-        Updates the inner timedelta parameter, calculating it.
-
-        Raises
-        ------
-        SolysException
-            If an error happens when calling the Solys2.
-
-        Returns
-        -------
-        output : CommandOutput
-            Output of the command, data received from solys.
-        """
-        self.timedelta, out = self._calculate_timedelta()
-        return out
-    
-    def now(self) -> datetime.datetime:
-        """
-        Calculates the current Solys2 internal datetime without sending a TCP message.
-
-        Returns
-        -------
-        dt : datetime.datetime
-            Estimated Solys2 internal time.
-        """
-        return datetime.datetime.now(datetime.timezone.utc) + self.timedelta
 
 def translate_error(code: str) -> str:
     """

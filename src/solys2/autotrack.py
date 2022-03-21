@@ -39,6 +39,7 @@ __status__ = "Development"
 _SOLYS_APPROX_DELAY = 5
 _SOLYS_DELAY_MARGIN = 2
 _ASD_DELAY = 2
+_MAX_SECS_DIFF_WARN = 2
 
 class _TrackBody(Enum):
     """
@@ -102,6 +103,25 @@ def _get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger
         return body_calc_class(lat, lon, altitude, kernels_path)
     return body_calc_class(lat, lon)
 
+def _check_time_solys(solys: solys2.Solys2, logger: logging.Logger):
+    """
+    Check the solys internal time against the computer time and log an info or warning
+    message if necessary.
+
+    Parameters
+    ----------
+    solys : solys2.Solys2
+        Solys2 which time is wanted to be checked agains computer time.
+    logger : logging.Logger
+        Logger that will log out the log messages.
+    """
+    td, _ = solys.calculate_timedelta()
+    secs = td.total_seconds()
+    if abs(secs) <= _MAX_SECS_DIFF_WARN:
+        logger.info("Solys clock vs PC clock: {} seconds.".format(secs))
+    else:
+        logger.warning("Solys clock vs PC clock: {} seconds.".format(secs))
+
 def _wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: logging.Logger):
     """
     Waits until the solys is approx. pointing at the given position.
@@ -109,7 +129,7 @@ def _wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: l
     Parameters
     ----------
     solys : solys2.Solys2
-        Solys2 that will eventuallyp point to the given position.
+        Solys2 that will eventually point to the given position.
     az : float
         Azimuth of the position.
     ze : float
@@ -149,14 +169,18 @@ def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: 
     datetime_offset : float
         Offset of seconds that the body positions will be calculated, added to currrent time.
     """
-    dt = solys.now()
+    dt = datetime.datetime.now(datetime.timezone.utc)
     logger.info("UTC Datetime: {}.".format(dt))
+    check_time_solys = (dt.minute == 0 )
     try:
         prev_az, prev_ze, _ = solys.get_current_position()
         qsi, total_intens, _ = solys.get_sun_intensity()
         logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
         logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-        dt = solys.now()
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        if check_time_solys:
+            logger.debug("Checking computer time against Solys internal time.")
+            _check_time_solys(solys, logger)
         logger.info("Real UTC Datetime: {}".format(dt))
         dt = dt + datetime.timedelta(0, datetime_offset)
         logger.info("Position UTC Datetime: {}".format(dt))
@@ -168,10 +192,10 @@ def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: 
         logger.info("Sent positions: Azimuth: {} + {} ({}). Zenith: {} + {} ({}).\n".format(az,
             offset[0], new_az, ze, offset[1], new_ze))
         _wait_position_reached(solys, new_az, new_ze, logger)
-        dt = solys.now()
+        dt = datetime.datetime.now(datetime.timezone.utc)
         logger.info("Finished moving at UTC datetime: {}.".format(dt))
     except solys2.SolysException as e:
-        dt = solys.now()
+        dt = datetime.datetime.now(datetime.timezone.utc)
         logger.error("Error at UTC datetime: {}".format(dt))
         logger.error("Error: {}".format(e))
 
@@ -223,6 +247,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         logger.info("Tracking sun. Connected with Solys2.")
     else:
         logger.info("Tracking moon. Connected with Solys2.")
+    _check_time_solys(solys, logger)
     # Start tracking in a loop
     sleep_time = 0
     time_offset = ((seconds - _SOLYS_APPROX_DELAY) / 2.0) + _SOLYS_APPROX_DELAY
@@ -324,6 +349,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
 steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_offset,
         cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
         cp.zenith_step, cp.countdown, cp.post_wait))
+    _check_time_solys(solys, logger)
     # Generating the offsets
     offsets: List[Tuple[float, float]] = \
         [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset + cp.azimuth_step,
@@ -459,8 +485,9 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     solys = solys2.Solys2(ip, port, password)
     solys.set_power_save(False)
     body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
+    _check_time_solys(solys, logger)
 
-    dt = solys.now()
+    dt = datetime.datetime.now(datetime.timezone.utc)
     az, ze = body_calc.get_position(dt)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
@@ -471,7 +498,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     logger.info("Performing a lunar black of ({},{}) degrees. Connected with Solys2.".format(
         az_offset, ze_offset))
     _read_and_move(solys, body_calc, logger, (az_offset, ze_offset))
-    dt = solys.now()
+    dt = datetime.datetime.now(datetime.timezone.utc)
     prev_az, prev_ze, _ = solys.get_current_position()
     qsi, total_intens, _ = solys.get_sun_intensity()
     logger.info("UTC Datetime: {}".format(dt))
