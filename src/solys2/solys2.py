@@ -16,6 +16,7 @@ It exports the following functions:
 
 """___Built-In Modules___"""
 from dataclasses import dataclass
+import datetime
 from enum import Enum
 from typing import Tuple, List
 import time
@@ -28,7 +29,8 @@ from . import response
 from . import connection
 
 """___Authorship___"""
-__author__ = "Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, and Ramiro González Catón"
+__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
+Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/03/09"
 __maintainer__ = "Javier Gatón Herguedas"
 __email__ = "gaton@goa.uva.es"
@@ -123,6 +125,9 @@ class Solys2:
         Boolean value that stores if the connection is closed or not.
     offset_cp : list of float
         Adjustments of the motors. [adjustment_0, adjustment_1].
+    timedelta : datetime.timedelta
+        Difference between solys internal time (UTC) and the Computer time in UTC.
+        pc_time + timedelta = solys_time
     """
 
     def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
@@ -152,6 +157,7 @@ class Solys2:
 
         self.adjust()
         self.version()
+        self.update_timedelta()
 
     def connect(self):
         """
@@ -300,7 +306,7 @@ class Solys2:
         self.offset_cp = output.nums
         return output.nums[0], output.nums[1], output
 
-    def adjust_motor_0(self, degrees: float) -> CommandOutput:
+    def _adjust_motor_0(self, degrees: float) -> CommandOutput:
         """Adjust motor 0 (AD 0)
         
         Cause the physical <motor> position to be <relative position> further clockwise while the
@@ -318,6 +324,11 @@ class Solys2:
         ----------
         degrees : float
             Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
         """
         cmd = 'AD 0 {}'.format(degrees)
         output = self.send_command(cmd)
@@ -326,7 +337,7 @@ class Solys2:
             self.adjust()
         return output
 
-    def adjust_motor_1(self, degrees: float) -> CommandOutput:
+    def _adjust_motor_1(self, degrees: float) -> CommandOutput:
         """Adjust motor 1 (AD 1)
         
         Cause the physical <motor> position to be <relative position> further clockwise while the
@@ -344,6 +355,11 @@ class Solys2:
         ----------
         degrees : float
             Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
         """
         cmd = 'AD 1 {}'.format(degrees)
         output = self.send_command(cmd)
@@ -351,6 +367,54 @@ class Solys2:
                 output.out == response.OutCode.ANSWERED_VALUE_ERROR:
             self.adjust()
         return output
+    
+    def adjust_azimuth(self, degrees: float) -> CommandOutput:
+        """Adjust the azimuth motor.
+
+        Cause the azimuth motor to be adjusted by the given degrees. The <degrees> parameters
+        must be within [-0.2, 0.2] and the total adjustment must not exceed 4.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Parameters
+        ----------
+        degrees : float
+            Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        degrees = max(-0.2, min(0.2, degrees))
+        return self._adjust_motor_0(degrees)
+    
+    def adjust_zenith(self, degrees: float) -> CommandOutput:
+        """Adjust the zenith motor.
+
+        Cause the zenith motor to be adjusted by the given degrees. The <degrees> parameters
+        must be within [-0.2, 0.2] and the total adjustment must not exceed 4.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Parameters
+        ----------
+        degrees : float
+            Degrees of adjustment to move (clockwise). Contained in the range [-0.2, 0.2].
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        degrees = max(-0.2, min(0.2, degrees))
+        return self._adjust_motor_1(degrees)
 
     def version(self) -> CommandOutput:
         """Version (VE)
@@ -445,6 +509,23 @@ class Solys2:
         output = self.send_command("PO 1 {}".format(zenith))
         return output
     
+    def point_down(self) -> CommandOutput:
+        """Point down as much as possible
+        Set the zenith angle to the maximum possible (94.5)
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+        
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("PO 1 94.9")
+        return output
+
     def get_planned_position(self) -> Tuple[int, int, CommandOutput]:
         """Position (PO)
         Obtain the positions that the Solys sais it's going to.
@@ -666,6 +747,52 @@ class Solys2:
         total_intensity = output.nums[4]
         return intensities, total_intensity, output
     
+    def get_raw_status(self) -> Tuple[str, CommandOutput]:
+        """Status (IS)
+        Get the raw status code returned from the Solys2
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        raw_status : str
+            Raw status code received from the Solys2.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        output = self.send_command("IS")
+        raw_status = output.raw_response.replace("IS ", "", 1)
+        return raw_status, output
+
+    def get_status(self) -> Tuple[str, List[str], List[str], CommandOutput]:
+        """
+        Gets the status, translated for humans.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        ins_stat : str
+            Instrument status.
+        flags_true : list of str
+            List of all the activated flags.
+        flags_false : list of str
+            List of all the deactivated flags.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        raw_status, output = self.get_raw_status()
+        if output.out == response.OutCode.ERROR or output.out == response.OutCode.NONE:
+            return "Error communicating with the Solys2, couldn't retrieve status", [], [], output
+        ins_stat, flags_true, flags_false = response.translate_status(raw_status)
+        return ins_stat, flags_true, flags_false, output
+
     def _set_function_with_home(self, func: SolysFunction) -> List[CommandOutput]:
         """
         Set a tracking function, send the home function and mantain the motor adjustment.
@@ -689,8 +816,8 @@ class Solys2:
         o1 = self.home()
         offset0 = self.offset_cp[0]
         offset1 = self.offset_cp[1]
-        o2 = self.adjust_motor_0(offset0)
-        o3 = self.adjust_motor_1(offset1)
+        o2 = self._adjust_motor_0(offset0)
+        o3 = self._adjust_motor_1(offset1)
         return [o0, o1, o2, o3]
 
     def set_automatic(self) -> List[CommandOutput]:
@@ -734,6 +861,83 @@ class Solys2:
             Output of the commands, data received from solys.
         """
         return self._set_function_with_home(SolysFunction.STANDARD_OPERATION)
+    
+    def get_datetime(self) -> Tuple[datetime.datetime, CommandOutput]:
+        """Get Time (TI)
+        Retrieve the internal time (Universal).
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        dt : datetime.datetime
+            Solys2 internal time.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        t0 = time.time()
+        output = self.send_command("TI")
+        nums = output.nums
+        if len(nums) != 5:
+            dt = datetime.datetime(0, 0, 0)
+            return dt, output
+        tf = time.time()
+        t_extra = (tf-t0)/2
+        dt = datetime.datetime(int(nums[0]), 1, 1, int(nums[2]), int(nums[3]), int(nums[4]),
+            tzinfo=datetime.timezone.utc) + datetime.timedelta(int(nums[1])-1, t_extra)
+        return dt, output
+    
+    def _calculate_timedelta(self) -> Tuple[datetime.timedelta, CommandOutput]:
+        """
+        Calculate the difference between solys internal time (UTC) and the Computer
+        time in UTC.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        tdt : datetime.timedelta
+            Difference between solys internal time (UTC) and the Computer time in UTC.
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        solys_dt, out = self.get_datetime()
+        pc_dt = datetime.datetime.now(datetime.timezone.utc)
+        return (solys_dt - pc_dt), out
+    
+    def update_timedelta(self) -> CommandOutput:
+        """
+        Updates the inner timedelta parameter, calculating it.
+
+        Raises
+        ------
+        SolysException
+            If an error happens when calling the Solys2.
+
+        Returns
+        -------
+        output : CommandOutput
+            Output of the command, data received from solys.
+        """
+        self.timedelta, out = self._calculate_timedelta()
+        return out
+    
+    def now(self) -> datetime.datetime:
+        """
+        Calculates the current Solys2 internal datetime without sending a TCP message.
+
+        Returns
+        -------
+        dt : datetime.datetime
+            Estimated Solys2 internal time.
+        """
+        return datetime.datetime.now(datetime.timezone.utc) + self.timedelta
 
 def translate_error(code: str) -> str:
     """
