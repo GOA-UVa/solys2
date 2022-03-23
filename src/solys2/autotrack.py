@@ -547,7 +547,8 @@ class _BodyTracker:
     """
     def __init__(self, ip: str, seconds: float, library: psc._BodyLibrary, port: int = 15000,
         password: str = "solys", log: bool = False, logfile: str = "",
-        altitude: float = 0, kernels_path: str = "./kernels"):
+        altitude: float = 0, kernels_path: str = "./kernels",
+        extra_log_handlers: List[logging.Handler] = []):
         """
         Parameters
         ----------
@@ -572,17 +573,19 @@ class _BodyTracker:
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
         self.mutex_cont = Lock()
         self.cont_track = _ContainedBool(True)
-        self._configure_logger(log, logfile)
+        self._configure_logger(log, logfile, extra_log_handlers)
         self._is_finished = _ContainedBool(False)
         # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, library, self.mutex_cont,
             self.cont_track, self.logger, port, password, self._is_finished, altitude, kernels_path))
         self.thread.start()
     
-    def _configure_logger(self, log: bool, logfile: str):
+    def _configure_logger(self, log: bool, logfile: str, extra_log_handlers: List[logging.Handler]):
         """Configure the logging output
         
         Shell logging at warning level and file logger at debug level if log is True.
@@ -594,12 +597,16 @@ class _BodyTracker:
         logfile : str
             Path of the file where the logging will be stored. In case that it's not used, it will be
             printed in stderr.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
         randstr = _gen_random_str(20)
         logging.basicConfig(level=logging.WARNING)
         for handler in logging.getLogger().handlers:
             handler.setLevel(logging.WARNING)
         self.logger = logging.getLogger('autotrack._BodyTracker-{}'.format(randstr))
+        for hand in extra_log_handlers:
+            self.logger.addHandler(hand)
         if logfile != "":
             log_handler = logging.FileHandler(logfile, mode='w')
             log_handler.setFormatter(logging.Formatter('%(levelname)s:%(message)s'))
@@ -646,7 +653,8 @@ class MoonTracker(_BodyTracker):
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         log: bool = False, logfile: str = "", library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
-        altitude: float = 0, kernels_path: str = "./kernels"):
+        altitude: float = 0, kernels_path: str = "./kernels",
+        extra_log_handlers: List[logging.Handler] = []):
         """
         Parameters
         ----------
@@ -671,8 +679,11 @@ class MoonTracker(_BodyTracker):
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
-        super().__init__(ip, seconds, library, port, password, log, logfile, altitude, kernels_path)
+        super().__init__(ip, seconds, library, port, password, log, logfile, altitude,
+            kernels_path, extra_log_handlers)
 
 class SunTracker(_BodyTracker):
     """SunTracker
@@ -681,7 +692,8 @@ class SunTracker(_BodyTracker):
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         log: bool = False, logfile: str = "", library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
-        altitude: float = 0, kernels_path: str = "./kernels"):
+        altitude: float = 0, kernels_path: str = "./kernels",
+        extra_log_handlers: List[logging.Handler] = []):
         """
         Parameters
         ----------
@@ -706,5 +718,8 @@ class SunTracker(_BodyTracker):
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
-        super().__init__(ip, seconds, library, port, password, log, logfile, altitude, kernels_path)
+        super().__init__(ip, seconds, library, port, password, log, logfile, altitude,
+            kernels_path, extra_log_handlers)
