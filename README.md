@@ -1,6 +1,6 @@
 # solys2
 
-![Version 0.1.6](https://img.shields.io/badge/version-0.1.6-informational)
+![Version 0.1.7](https://img.shields.io/badge/version-0.1.7-informational)
 
 Python package for connecting and communicating with the Solys 2 via TCP/IP
 and setting it up to automatically track the moon or the sun.
