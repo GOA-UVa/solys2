@@ -812,8 +812,11 @@ class Solys2:
         o1 = self.home()
         offset0 = self.offset_cp[0]
         offset1 = self.offset_cp[1]
-        o2 = self._adjust_motor_0(offset0)
-        o3 = self._adjust_motor_1(offset1)
+        if func not in [SolysFunction.ACTIVE_TRACKING, SolysFunction.SUNTRACKING, SolysFunction.NO_FUNCTION]:
+            o2 = self._adjust_motor_0(offset0)
+            o3 = self._adjust_motor_1(offset1)
+        else:
+            o2 = o3 = None
         return [o0, o1, o2, o3]
 
     def set_automatic(self) -> List[CommandOutput]:
