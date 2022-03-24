@@ -304,12 +304,13 @@ class CrossParameters:
     zenith_min_offset: float
     zenith_max_offset: float
     zenith_step: float
-    countdown: float
-    post_wait: float
+    countdown: int
+    post_wait: int
 
 def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cross_params: CrossParameters,
     port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None,
-    altitude: float = 0, kernels_path: str = "./kernels"):
+    altitude: float = 0, kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
     """
     Perform a cross over a body
 
@@ -335,6 +336,11 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
     kernels_path : str
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
     """
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
@@ -350,6 +356,9 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
         cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
         cp.zenith_step, cp.countdown, cp.post_wait))
     _check_time_solys(solys, logger)
+    stoppable: bool = False
+    if mutex_cont and cont_track:
+        stopabble = True
     # Generating the offsets
     offsets: List[Tuple[float, float]] = \
         [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset + cp.azimuth_step,
@@ -365,6 +374,13 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
     logger.debug("Moved next to the body.")
     logger.info("Starting cross")
     for offset in offsets:
+        if stoppable:
+            mutex_cont.acquire()
+        if stoppable and not cont_track.value:
+            logger.info("Cross stopped manually.")
+            break
+        if stoppable:
+            mutex_cont.release()
         t0 = time.time()
         _read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
         sleep_time0 = cp.countdown
@@ -390,7 +406,8 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
 def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
-    kernels_path: str = "./kernels"):
+    kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
     """
     Perform a cross over the Moon
 
@@ -416,6 +433,11 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     kernels_path : str
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
         altitude, kernels_path)
@@ -423,7 +445,8 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
 def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
     library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
-    kernels_path: str = "./kernels"):
+    kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
     """
     Perform a cross over the Sun
 
@@ -449,6 +472,11 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     kernels_path : str
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
         altitude, kernels_path)
