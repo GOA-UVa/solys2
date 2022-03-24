@@ -608,7 +608,7 @@ class _BodyTracker:
         for hand in extra_log_handlers:
             self.logger.addHandler(hand)
         if logfile != "":
-            log_handler = logging.FileHandler(logfile, mode='w')
+            log_handler = logging.FileHandler(logfile, mode='a')
             log_handler.setFormatter(logging.Formatter('%(levelname)s:%(message)s'))
             self.logger.addHandler(log_handler)
             if log:
