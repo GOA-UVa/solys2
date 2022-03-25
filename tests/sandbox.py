@@ -67,10 +67,10 @@ def pruebas_comandos_raw():
     s.close()
 
 def prueba_cross():
-    cp = aut.CrossParameters(-1.5, 1.501, 0.3, -1.5, 1.501, 0.3, 5, 2)
+    cp = aut.CrossParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 3)
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger("sandbox")
-    aut.lunar_cross(TCP_IP, logger, cp, TCP_PORT, "solys", library=psc.MoonLibrary.SPICEDMOON, altitude=2373, kernels_path="./kernels.temp.dir")
+    aut.solar_cross(TCP_IP, logger, cp, TCP_PORT, "solys", library=psc.SunLibrary.SPICEDSUN, altitude=710, kernels_path="./kernels.temp.dir")
 
 def prueba_black():
     logging.basicConfig(level=logging.DEBUG)
@@ -79,7 +79,9 @@ def prueba_black():
 
 def prueba_track():
     #mt = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.SPICEDMOON, altitude=710, kernels_path="./kernels.temp.dir")
-    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.SPICEDSUN, altitude=710, kernels_path="./kernels.temp.dir")
+    handler = logging.StreamHandler()
+    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.SPICEDSUN, altitude=710, kernels_path="./kernels.temp.dir",
+        extra_log_handlers=[handler])
 
 def main():
     prueba_track()

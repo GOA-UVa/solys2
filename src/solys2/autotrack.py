@@ -304,12 +304,70 @@ class CrossParameters:
     zenith_min_offset: float
     zenith_max_offset: float
     zenith_step: float
-    countdown: float
-    post_wait: float
+    countdown: int
+    post_wait: int
+
+def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
+    offsets: List[Tuple[float, float]], body_calc: psc.BodyCalculator, cp: CrossParameters,
+    mutex_cont: Lock = None, cont_track: _ContainedBool = None):
+    """
+    Perform a series of solys-synchronized offsets over a body, for the cross and mesh.
+
+    Parameters
+    ----------
+    solys : Solys2
+        Solys2 instance that will be used to send de messages with.
+    logger : logging.Logger
+        Logger that will log out the log messages.
+    offsets : list of tuple of floats
+        List of offsets (az, ze) that will be performed.
+    body_calc : BodyCalculator
+        Calculator that will be able to calculate the position of the body for a given date.
+    cp : CrossParameters
+        Parameters needed when performing a cross/mesh over a Body.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track.
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
+    """
+    stoppable: bool = False
+    if mutex_cont and cont_track:
+        stoppable = True
+    sleep_time0 = 0
+    sleep_time1 = 0
+    solys_delay = _SOLYS_APPROX_DELAY + _SOLYS_DELAY_MARGIN
+    dt_offset = cp.countdown + _ASD_DELAY/2.0 + solys_delay
+    for offset in offsets:
+        if stoppable:
+            mutex_cont.acquire()
+        if stoppable and not cont_track.value:
+            logger.info("Operation stopped manually.")
+            break
+        if stoppable:
+            mutex_cont.release()
+        t0 = time.time()
+        _read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
+        sleep_time0 = cp.countdown
+        tf = time.time()
+        diff_td = tf - t0
+        wait_time = (dt_offset - _ASD_DELAY/2.0) - (diff_td + sleep_time0)
+        if wait_time > 0:
+            logger.debug("Sleeping {} seconds".format(wait_time))
+            time.sleep(wait_time)
+        for i in range(sleep_time0):
+            logger.warn("COUNTDOWN:{}".format(sleep_time0-i))
+            time.sleep(1)
+        logger.warn("COUNTDOWN:0")
+        sleep_time1 = cp.post_wait
+        logger.debug("Waiting {} seconds (post).".format(sleep_time1))
+        if sleep_time1 > 0:
+            time.sleep(sleep_time1)
 
 def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cross_params: CrossParameters,
     port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None,
-    altitude: float = 0, kernels_path: str = "./kernels"):
+    altitude: float = 0, kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
     """
     Perform a cross over a body
 
@@ -335,6 +393,11 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
     kernels_path : str
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
     """
     # Connect with the Solys2 and set the initial configuration.
     solys = solys2.Solys2(ip, port, password)
@@ -356,32 +419,11 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
             cp.azimuth_step)]
     offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset + cp.zenith_step,
         cp.zenith_step)]
-    sleep_time0 = 0
-    sleep_time1 = 0
-    solys_delay = _SOLYS_APPROX_DELAY + _SOLYS_DELAY_MARGIN
-    dt_offset = cp.countdown + _ASD_DELAY/2.0 + solys_delay
     logger.debug("Moving next to the body...")
     _read_and_move(solys, body_calc, logger, (0,0))
     logger.debug("Moved next to the body.")
     logger.info("Starting cross")
-    for offset in offsets:
-        t0 = time.time()
-        _read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
-        sleep_time0 = cp.countdown
-        tf = time.time()
-        diff_td = tf - t0
-        wait_time = (dt_offset - _ASD_DELAY/2.0) - (diff_td + sleep_time0)
-        if wait_time > 0:
-            logger.debug("Sleeping {} seconds".format(wait_time))
-            time.sleep(wait_time)
-        for i in range(sleep_time0):
-            logger.warn("COUNTDOWN:{}".format(sleep_time0-i))
-            time.sleep(1)
-        logger.warn("COUNTDOWN:0")
-        sleep_time1 = cp.post_wait
-        logger.debug("Waiting {} seconds (post).".format(sleep_time1))
-        if sleep_time1 > 0:
-            time.sleep(sleep_time1)
+    _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track)
     solys.close()
     if is_finished:
         is_finished.value = True
@@ -390,7 +432,8 @@ steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_off
 def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
-    kernels_path: str = "./kernels"):
+    kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
     """
     Perform a cross over the Moon
 
@@ -416,14 +459,20 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     kernels_path : str
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        altitude, kernels_path)
+        altitude, kernels_path, mutex_cont, cont_track)
 
 def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
     library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
-    kernels_path: str = "./kernels"):
+    kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
     """
     Perform a cross over the Sun
 
@@ -449,9 +498,158 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
     kernels_path : str
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        altitude, kernels_path)
+        altitude, kernels_path, mutex_cont, cont_track)
+
+def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_params: CrossParameters,
+    port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None,
+    altitude: float = 0, kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
+    """
+    Perform a mesh over a body
+
+    Parameters
+    ----------
+    ip : str
+        IP of the solys.
+    library : _BodyLibrary
+        Body library that will be used to track the body. Moon or Sun.
+    logger : logging.Logger
+        Logger that will log out the log messages
+    mesh_params : CrossParameters
+        Parameters needed when performing a mesh over a Body.
+    port : int
+        Access port. By default 15000.
+    password : str
+        Ethernet user password. By default is "solys".
+    is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it should be changed
+        to True when exiting the function.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
+    """
+    # Connect with the Solys2 and set the initial configuration.
+    solys = solys2.Solys2(ip, port, password)
+    solys.set_power_save(False)
+    body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
+    if library in psc.SunLibrary:
+        logger.info("Performing a solar mesh. Connected with Solys2.")
+    else:
+        logger.info("Performing a lunar mesh. Connected with Solys2.")
+    cp = mesh_params
+    logger.info("Performing mesh with azimuth range [{},{}], steps {}, and zenith range [{},{}],\
+steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_offset,
+        cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
+        cp.zenith_step, cp.countdown, cp.post_wait))
+    _check_time_solys(solys, logger)
+    # Generating the offsets
+    offsets: List[Tuple[float, float]] = []
+    for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset + cp.azimuth_step,
+            cp.azimuth_step):
+        for j in np.arange(cp.zenith_min_offset, cp.zenith_max_offset + cp.zenith_step,
+                cp.zenith_step):
+            offsets.append((i,j))
+    logger.debug("Moving next to the body...")
+    _read_and_move(solys, body_calc, logger, (0,0))
+    logger.debug("Moved next to the body.")
+    logger.info("Starting mesh")
+    _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track)
+    solys.close()
+    if is_finished:
+        is_finished.value = True
+    logger.info("Tracking stopped and connection closed.")
+
+def lunar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, port: int = 15000,
+    password: str = "solys", is_finished: _ContainedBool = None,
+    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
+    kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
+    """
+    Perform a mesh over the Moon
+
+    Parameters
+    ----------
+    ip : str
+        IP of the solys.
+    logger : logging.Logger
+        Logger that will log out the log messages
+    mesh_params : CrossParameters
+        Parameters needed when performing a mesh over a Body.
+    port : int
+        Access port. By default 15000.
+    password : str
+        Ethernet user password. By default is "solys".
+    is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it should be changed
+        to True when exiting the function.
+    library : MoonLibrary
+        Lunar library that will be used to track the Moon. By default is ephem.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
+    """
+    return _mesh_body(ip, library, logger, mesh_params, port, password, is_finished,
+        altitude, kernels_path, mutex_cont, cont_track)
+
+def solar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, port: int = 15000,
+    password: str = "solys", is_finished: _ContainedBool = None,
+    library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
+    kernels_path: str = "./kernels", mutex_cont: Lock = None,
+    cont_track: _ContainedBool = None):
+    """
+    Perform a mesh over the Sun
+
+    Parameters
+    ----------
+    ip : str
+        IP of the solys.
+    logger : logging.Logger
+        Logger that will log out the log messages
+    mesh_params : CrossParameters
+        Parameters needed when performing a mesh over a Body.
+    port : int
+        Access port. By default 15000.
+    password : str
+        Ethernet user password. By default is "solys".
+    is_finished : _ContainedBool
+        Container for the boolean value that initially will be False, but it should be changed
+        to True when exiting the function.
+    library : SunLibrary
+        Solar library that will be used to track the Sun. By default is pysolar.
+    altitude : float
+        Altitude in meters of the observer point. Used only if SPICE library is selected.
+    kernels_path : str
+        Directory where the needed SPICE kernels are stored. Used only if SPICE library
+        is selected.
+    mutex_cont : Lock
+        Mutex that controls the access to the variable cont_track
+    cont_track : _ContainedBool
+        Container for the boolean value that represents if the tracking must stop or if it should
+        continue.
+    """
+    return _mesh_body(ip, library, logger, mesh_params, port, password, is_finished,
+        altitude, kernels_path, mutex_cont, cont_track)
 
 def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     password: str = "solys", is_finished: _ContainedBool = None,
@@ -547,7 +745,8 @@ class _BodyTracker:
     """
     def __init__(self, ip: str, seconds: float, library: psc._BodyLibrary, port: int = 15000,
         password: str = "solys", log: bool = False, logfile: str = "",
-        altitude: float = 0, kernels_path: str = "./kernels"):
+        altitude: float = 0, kernels_path: str = "./kernels",
+        extra_log_handlers: List[logging.Handler] = []):
         """
         Parameters
         ----------
@@ -572,17 +771,19 @@ class _BodyTracker:
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
         self.mutex_cont = Lock()
         self.cont_track = _ContainedBool(True)
-        self._configure_logger(log, logfile)
+        self._configure_logger(log, logfile, extra_log_handlers)
         self._is_finished = _ContainedBool(False)
         # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, library, self.mutex_cont,
             self.cont_track, self.logger, port, password, self._is_finished, altitude, kernels_path))
         self.thread.start()
     
-    def _configure_logger(self, log: bool, logfile: str):
+    def _configure_logger(self, log: bool, logfile: str, extra_log_handlers: List[logging.Handler]):
         """Configure the logging output
         
         Shell logging at warning level and file logger at debug level if log is True.
@@ -594,14 +795,18 @@ class _BodyTracker:
         logfile : str
             Path of the file where the logging will be stored. In case that it's not used, it will be
             printed in stderr.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
         randstr = _gen_random_str(20)
         logging.basicConfig(level=logging.WARNING)
         for handler in logging.getLogger().handlers:
             handler.setLevel(logging.WARNING)
         self.logger = logging.getLogger('autotrack._BodyTracker-{}'.format(randstr))
+        for hand in extra_log_handlers:
+            self.logger.addHandler(hand)
         if logfile != "":
-            log_handler = logging.FileHandler(logfile, mode='w')
+            log_handler = logging.FileHandler(logfile, mode='a')
             log_handler.setFormatter(logging.Formatter('%(levelname)s:%(message)s'))
             self.logger.addHandler(log_handler)
             if log:
@@ -646,7 +851,8 @@ class MoonTracker(_BodyTracker):
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         log: bool = False, logfile: str = "", library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
-        altitude: float = 0, kernels_path: str = "./kernels"):
+        altitude: float = 0, kernels_path: str = "./kernels",
+        extra_log_handlers: List[logging.Handler] = []):
         """
         Parameters
         ----------
@@ -671,8 +877,11 @@ class MoonTracker(_BodyTracker):
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
-        super().__init__(ip, seconds, library, port, password, log, logfile, altitude, kernels_path)
+        super().__init__(ip, seconds, library, port, password, log, logfile, altitude,
+            kernels_path, extra_log_handlers)
 
 class SunTracker(_BodyTracker):
     """SunTracker
@@ -681,7 +890,8 @@ class SunTracker(_BodyTracker):
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         log: bool = False, logfile: str = "", library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
-        altitude: float = 0, kernels_path: str = "./kernels"):
+        altitude: float = 0, kernels_path: str = "./kernels",
+        extra_log_handlers: List[logging.Handler] = []):
         """
         Parameters
         ----------
@@ -706,5 +916,8 @@ class SunTracker(_BodyTracker):
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
+        extra_log_handlers : list of logging.Handler
+            Custom handlers which the log will also log to.
         """
-        super().__init__(ip, seconds, library, port, password, log, logfile, altitude, kernels_path)
+        super().__init__(ip, seconds, library, port, password, log, logfile, altitude,
+            kernels_path, extra_log_handlers)
