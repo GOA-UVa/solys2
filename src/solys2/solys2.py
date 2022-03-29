@@ -874,7 +874,7 @@ class Solys2:
         output = self.send_command("TI")
         nums = output.nums
         if len(nums) != 5:
-            dt = datetime.datetime(0, 0, 0)
+            dt = datetime.datetime(1, 1, 1)
             return dt, output
         tf = time.time()
         t_extra = (tf-t0)/2
