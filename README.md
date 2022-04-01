@@ -7,13 +7,13 @@ and setting it up to automatically track the moon or the sun.
 
 ## Requirements
 
-python>=3.8
-numpy>=1.22.2
-pylunar>=0.6.0
-pysolar>=0.10
-ephem>=4.1.3
-spicedmoon>=0.1.2
-spicedsun>=0.0.1
+- python>=3.8
+- numpy>=1.22.2
+- pylunar>=0.6.0
+- pysolar>=0.10
+- ephem>=4.1.3
+- spicedmoon>=0.1.2
+- spicedsun>=0.0.1
 
 ## Installation
 
