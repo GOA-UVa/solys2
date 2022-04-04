@@ -346,7 +346,6 @@ class _BodyTracker:
         self.thread = Thread(target = _track_body, args = (ip, seconds, library, self.mutex_cont,
             self.cont_track, self.logger, port, password, self._is_finished, altitude,
             kernels_path, solys_delay))
-        self.thread.start()
     
     def _configure_logger(self, log: bool, logfile: str, extra_log_handlers: List[logging.Handler]):
         """Configure the logging output
@@ -380,6 +379,10 @@ class _BodyTracker:
             logging.getLogger().setLevel(logging.DEBUG)
             for handler in logging.getLogger().handlers:
                 handler.setLevel(logging.DEBUG)
+
+    def start_tracking(self):
+        """Start tracking the previously selected body."""
+        self.thread.start()
 
     def stop_tracking(self):
         """

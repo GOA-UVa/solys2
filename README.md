@@ -62,6 +62,9 @@ from solys2 import autotrack
 # information (movements, etc) to a file called "solys.log"
 st = autotrack.SunTracker(ip, 15, port, password, True, "solys.log")
 
+# Start tracking
+st.start_tracking()
+
 # Stop tracking the Sun
 st.stop_tracking()
 ```
