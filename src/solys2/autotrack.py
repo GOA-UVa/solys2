@@ -52,7 +52,7 @@ class _TrackBody(Enum):
     MOON = 1
 
 @dataclass
-class _ContainedBool:
+class ContainedBool:
     """
     Dataclass that acts as a container of a boolean variable so it gets passed as a
     reference.
@@ -62,6 +62,8 @@ class _ContainedBool:
 def _get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger: logging.Logger,
     altitude: float = 0, kernels_path: str = "./kernels") -> psc.BodyCalculator:
     """
+    Obtain the BodyCalculator corresponding to the given parameters.
+
     Parameters
     ----------
     solys : solys2.Solys2
@@ -200,7 +202,7 @@ def _read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: 
         logger.error("Error: {}".format(e))
 
 def _exception_tracking(logger: logging.Logger, e: Exception, solys: solys2.Solys2,
-    is_finished: _ContainedBool):
+    is_finished: ContainedBool):
     """
     When an execution fails and must end a set of actions must be taken in order
     to communicate it and synchronize it.
@@ -228,9 +230,10 @@ def _exception_tracking(logger: logging.Logger, e: Exception, solys: solys2.Soly
         is_finished.value = True
 
 def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: Lock,
-    cont_track: _ContainedBool, logger: logging.Logger, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None,
-    altitude: float = 0, kernels_path: str = "./kernels"):
+    cont_track: ContainedBool, logger: logging.Logger, port: int = 15000,
+    password: str = "solys", is_finished: ContainedBool = None,
+    altitude: float = 0, kernels_path: str = "./kernels",
+    solys_delay: float = _SOLYS_APPROX_DELAY):
     """
     Track a celestial body
 
@@ -244,7 +247,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         Body library that will be used to track the body. Moon or Sun.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
     logger : logging.Logger
@@ -253,7 +256,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     altitude : float
@@ -261,6 +264,9 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
     kernels_path : str
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
 
     Raises
     ------
@@ -279,7 +285,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         _check_time_solys(solys, logger)
         # Start tracking in a loop
         sleep_time = 0
-        time_offset = ((seconds - _SOLYS_APPROX_DELAY) / 2.0) + _SOLYS_APPROX_DELAY
+        time_offset = ((seconds - solys_delay) / 2.0) + solys_delay
         t0 = time.time()
         mutex_cont.acquire()
         cont_track.value = True
@@ -305,7 +311,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
 @dataclass
 class CrossParameters:
     """
-    Parameters needed when performing a cross over a Body.
+    Parameters needed when performing a cross or a mesh over a Body.
 
     The offset attributes will define the interval that will be per
 
@@ -340,7 +346,9 @@ class CrossParameters:
 
 def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
     offsets: List[Tuple[float, float]], body_calc: psc.BodyCalculator, cp: CrossParameters,
-    mutex_cont: Lock = None, cont_track: _ContainedBool = None):
+    mutex_cont: Lock = None, cont_track: ContainedBool = None,
+    solys_delay: float = _SOLYS_APPROX_DELAY, solys_delay_margin: float = _SOLYS_DELAY_MARGIN,
+    instrument_delay: float = _ASD_DELAY):
     """
     Perform a series of solys-synchronized offsets over a body, for the cross and mesh.
 
@@ -358,17 +366,26 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
         Parameters needed when performing a cross/mesh over a Body.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track.
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
+    solys_delay_margin : float
+        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+        Solys2 to move to a position and confirm that it has reached it, since the moment when
+        the "move position" command was sent, (for most cases).
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
     """
     stoppable: bool = False
     if mutex_cont and cont_track:
         stoppable = True
     sleep_time0 = 0
     sleep_time1 = 0
-    solys_delay = _SOLYS_APPROX_DELAY + _SOLYS_DELAY_MARGIN
-    dt_offset = cp.countdown + _ASD_DELAY/2.0 + solys_delay
+    solys_tot_delay = solys_delay + solys_delay_margin
+    dt_offset = cp.countdown + instrument_delay/2.0 + solys_tot_delay
     for offset in offsets:
         if stoppable:
             mutex_cont.acquire()
@@ -396,9 +413,10 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
             time.sleep(sleep_time1)
 
 def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cross_params: CrossParameters,
-    port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None,
+    port: int = 15000, password: str = "solys", is_finished: ContainedBool = None,
     altitude: float = 0, kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _ContainedBool = None):
+    cont_track: ContainedBool = None, solys_delay: float = _SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = _SOLYS_DELAY_MARGIN, instrument_delay: float = _ASD_DELAY):
     """
     Perform a cross over a body
 
@@ -416,7 +434,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     altitude : float
@@ -426,9 +444,18 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
         is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
+    solys_delay_margin : float
+        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+        Solys2 to move to a position and confirm that it has reached it, since the moment when
+        the "move position" command was sent, (for most cases).
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
     """
     try:
         # Connect with the Solys2 and set the initial configuration.
@@ -455,7 +482,8 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
         _read_and_move(solys, body_calc, logger, (0,0))
         logger.debug("Moved next to the body.")
         logger.info("Starting cross")
-        _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track)
+        _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track,
+            solys_delay, solys_delay_margin, instrument_delay)
         solys.close()
         if is_finished:
             is_finished.value = True
@@ -464,10 +492,11 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, cros
         _exception_tracking(logger, e, solys, is_finished)
 
 def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None,
+    password: str = "solys", is_finished: ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _ContainedBool = None):
+    cont_track: ContainedBool = None, solys_delay: float = _SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = _SOLYS_DELAY_MARGIN, instrument_delay: float = _ASD_DELAY):
     """
     Perform a cross over the Moon
 
@@ -483,7 +512,7 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     library : MoonLibrary
@@ -495,18 +524,29 @@ def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
         is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
+    solys_delay_margin : float
+        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+        Solys2 to move to a position and confirm that it has reached it, since the moment when
+        the "move position" command was sent, (for most cases).
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track)
+        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
+        instrument_delay)
 
 def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None,
+    password: str = "solys", is_finished: ContainedBool = None,
     library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
     kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _ContainedBool = None):
+    cont_track: ContainedBool = None, solys_delay: float = _SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = _SOLYS_DELAY_MARGIN, instrument_delay: float = _ASD_DELAY):
     """
     Perform a cross over the Sun
 
@@ -522,7 +562,7 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     library : SunLibrary
@@ -534,17 +574,28 @@ def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, 
         is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
+    solys_delay_margin : float
+        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+        Solys2 to move to a position and confirm that it has reached it, since the moment when
+        the "move position" command was sent, (for most cases).
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
     """
     return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track)
+        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
+        instrument_delay)
 
 def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_params: CrossParameters,
-    port: int = 15000, password: str = "solys", is_finished: _ContainedBool = None,
+    port: int = 15000, password: str = "solys", is_finished: ContainedBool = None,
     altitude: float = 0, kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _ContainedBool = None):
+    cont_track: ContainedBool = None, solys_delay: float = _SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = _SOLYS_DELAY_MARGIN, instrument_delay: float = _ASD_DELAY):
     """
     Perform a mesh over a body
 
@@ -562,7 +613,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     altitude : float
@@ -572,9 +623,18 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
+    solys_delay_margin : float
+        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+        Solys2 to move to a position and confirm that it has reached it, since the moment when
+        the "move position" command was sent, (for most cases).
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
     """
     try:
         # Connect with the Solys2 and set the initial configuration.
@@ -602,7 +662,8 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         _read_and_move(solys, body_calc, logger, (0,0))
         logger.debug("Moved next to the body.")
         logger.info("Starting mesh")
-        _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track)
+        _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track,
+            solys_delay, solys_delay_margin, instrument_delay)
         solys.close()
         if is_finished:
             is_finished.value = True
@@ -611,10 +672,11 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         _exception_tracking(logger, e, solys, is_finished)
 
 def lunar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None,
+    password: str = "solys", is_finished: ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _ContainedBool = None):
+    cont_track: ContainedBool = None, solys_delay: float = _SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = _SOLYS_DELAY_MARGIN, instrument_delay: float = _ASD_DELAY):
     """
     Perform a mesh over the Moon
 
@@ -630,7 +692,7 @@ def lunar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, po
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     library : MoonLibrary
@@ -642,18 +704,29 @@ def lunar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, po
         is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
+    solys_delay_margin : float
+        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+        Solys2 to move to a position and confirm that it has reached it, since the moment when
+        the "move position" command was sent, (for most cases).
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
     """
     return _mesh_body(ip, library, logger, mesh_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track)
+        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
+        instrument_delay)
 
 def solar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None,
+    password: str = "solys", is_finished: ContainedBool = None,
     library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
     kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _ContainedBool = None):
+    cont_track: ContainedBool = None, solys_delay: float = _SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = _SOLYS_DELAY_MARGIN, instrument_delay: float = _ASD_DELAY):
     """
     Perform a mesh over the Sun
 
@@ -669,7 +742,7 @@ def solar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, po
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     library : SunLibrary
@@ -681,15 +754,25 @@ def solar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, po
         is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
+    solys_delay : float
+        Approximate delay in seconds between telling the Solys2 to move to a position and
+        the Solys2 saying that it reached that position.
+    solys_delay_margin : float
+        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+        Solys2 to move to a position and confirm that it has reached it, since the moment when
+        the "move position" command was sent, (for most cases).
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
     """
     return _mesh_body(ip, library, logger, mesh_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track)
+        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
+        instrument_delay)
 
 def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
-    password: str = "solys", is_finished: _ContainedBool = None,
+    password: str = "solys", is_finished: ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels"):
     """
@@ -706,7 +789,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
         Access port. By default 15000.
     password : str
         Ethernet user password. By default is "solys".
-    is_finished : _ContainedBool
+    is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it should be changed
         to True when exiting the function.
     library : MoonLibrary
@@ -772,21 +855,22 @@ class _BodyTracker:
     ----------
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
-    cont_track : _ContainedBool
+    cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
         continue.
     logger : logging.Logger
         Logger that will log out the log messages.
     thread : Thread
         Thread that will execute the tracking function.
-    _is_finished : _ContainedBool
+    _is_finished : ContainedBool
         Container for the boolean value that initially will be False, but it will be True
         when the thread has successfully ended execution.
     """
     def __init__(self, ip: str, seconds: float, library: psc._BodyLibrary, port: int = 15000,
         password: str = "solys", log: bool = False, logfile: str = "",
         altitude: float = 0, kernels_path: str = "./kernels",
-        extra_log_handlers: List[logging.Handler] = []):
+        extra_log_handlers: List[logging.Handler] = [],
+        solys_delay: float = _SOLYS_APPROX_DELAY):
         """
         Parameters
         ----------
@@ -813,14 +897,18 @@ class _BodyTracker:
             is selected.
         extra_log_handlers : list of logging.Handler
             Custom handlers which the log will also log to.
+        solys_delay : float
+            Approximate delay in seconds between telling the Solys2 to move to a position and
+            the Solys2 saying that it reached that position.
         """
         self.mutex_cont = Lock()
-        self.cont_track = _ContainedBool(True)
+        self.cont_track = ContainedBool(True)
         self._configure_logger(log, logfile, extra_log_handlers)
-        self._is_finished = _ContainedBool(False)
+        self._is_finished = ContainedBool(False)
         # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, library, self.mutex_cont,
-            self.cont_track, self.logger, port, password, self._is_finished, altitude, kernels_path))
+            self.cont_track, self.logger, port, password, self._is_finished, altitude,
+            kernels_path, solys_delay))
         self.thread.start()
     
     def _configure_logger(self, log: bool, logfile: str, extra_log_handlers: List[logging.Handler]):
