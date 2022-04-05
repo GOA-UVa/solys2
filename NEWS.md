@@ -8,3 +8,7 @@
 
 - _BodyTracker, MoonTracker and SunTracker require being called "start_tracking" in order
 to start the tracking.
+
+- Automation common functionalities moved to module autohelper.
+- Automation modules moved to folder automation.
+- Created doc folder and stored component diagram.

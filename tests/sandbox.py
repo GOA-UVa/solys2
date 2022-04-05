@@ -7,7 +7,7 @@ from typing import List, Tuple
 import logging
 
 from solys2 import solys2 as s2
-from solys2 import autotrack as aut
+from solys2.automation import autotrack as aut
 from solys2 import positioncalc as psc
 
 TCP_IP = "157.88.43.171"

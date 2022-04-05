@@ -16,11 +16,10 @@ from threading import Lock
 import numpy as np
 
 """___Solys2 Modules___"""
-from . import solys2
-from . import positioncalc as psc
-from .autotrack import _read_and_move, _get_body_calculator, _check_time_solys,\
-    _exception_tracking
-from . import common as _common
+from .. import solys2
+from .. import positioncalc as psc
+from . import autohelper
+from .. import common as _common
 
 @dataclass
 class CrossParameters:
@@ -110,7 +109,7 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
         if stoppable:
             mutex_cont.release()
         t0 = time.time()
-        _read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
+        autohelper.read_and_move(solys, body_calc, logger, offset, datetime_offset=dt_offset)
         sleep_time0 = cp.countdown
         tf = time.time()
         diff_td = tf - t0
@@ -178,7 +177,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         # Connect with the Solys2 and set the initial configuration.
         solys = solys2.Solys2(ip, port, password)
         solys.set_power_save(False)
-        body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
+        body_calc = autohelper.get_body_calculator(solys, library, logger, altitude, kernels_path)
         if library in psc.SunLibrary:
             logger.info("Performing a solar cross. Connected with Solys2.")
         else:
@@ -188,7 +187,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
 [{},{}], steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_offset,
             cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
             cp.zenith_step, cp.countdown, cp.post_wait))
-        _check_time_solys(solys, logger)
+        autohelper.check_time_solys(solys, logger)
         # Generating the offsets
         offsets: List[Tuple[float, float]] = \
             [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset +
@@ -196,7 +195,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset +
             cp.zenith_step, cp.zenith_step)]
         logger.debug("Moving next to the body...")
-        _read_and_move(solys, body_calc, logger, (0,0))
+        autohelper.read_and_move(solys, body_calc, logger, (0,0))
         logger.debug("Moved next to the body.")
         logger.info("Starting cross")
         _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track,
@@ -206,7 +205,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
             is_finished.value = True
         logger.info("Tracking stopped and connection closed.")
     except Exception as e:
-        _exception_tracking(logger, e, solys, is_finished)
+        autohelper.exception_tracking(logger, e, solys, is_finished)
 
 def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _common.ContainedBool = None,
@@ -359,7 +358,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         # Connect with the Solys2 and set the initial configuration.
         solys = solys2.Solys2(ip, port, password)
         solys.set_power_save(False)
-        body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
+        body_calc = autohelper.get_body_calculator(solys, library, logger, altitude, kernels_path)
         if library in psc.SunLibrary:
             logger.info("Performing a solar mesh. Connected with Solys2.")
         else:
@@ -369,7 +368,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
 [{},{}], steps {}. Countdown of {} and post wait of {} seconds".format(cp.azimuth_min_offset,
             cp.azimuth_max_offset, cp.azimuth_step, cp.zenith_min_offset, cp.zenith_max_offset,
             cp.zenith_step, cp.countdown, cp.post_wait))
-        _check_time_solys(solys, logger)
+        autohelper.check_time_solys(solys, logger)
         # Generating the offsets
         offsets: List[Tuple[float, float]] = []
         for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset + cp.azimuth_step,
@@ -378,7 +377,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
                     cp.zenith_step):
                 offsets.append((i,j))
         logger.debug("Moving next to the body...")
-        _read_and_move(solys, body_calc, logger, (0,0))
+        autohelper.read_and_move(solys, body_calc, logger, (0,0))
         logger.debug("Moved next to the body.")
         logger.info("Starting mesh")
         _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track,
@@ -388,7 +387,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
             is_finished.value = True
         logger.info("Tracking stopped and connection closed.")
     except Exception as e:
-        _exception_tracking(logger, e, solys, is_finished)
+        autohelper.exception_tracking(logger, e, solys, is_finished)
 
 def lunar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, port: int = 15000,
     password: str = "solys", is_finished: _common.ContainedBool = None,
@@ -524,8 +523,8 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     try:
         solys = solys2.Solys2(ip, port, password)
         solys.set_power_save(False)
-        body_calc = _get_body_calculator(solys, library, logger, altitude, kernels_path)
-        _check_time_solys(solys, logger)
+        body_calc = autohelper.get_body_calculator(solys, library, logger, altitude, kernels_path)
+        autohelper.check_time_solys(solys, logger)
 
         dt = datetime.datetime.now(datetime.timezone.utc)
         az, ze = body_calc.get_position(dt)
@@ -537,7 +536,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
         ze_offset = 45-ze
         logger.info("Performing a lunar black of ({},{}) degrees. Connected with Solys2.".format(
             az_offset, ze_offset))
-        _read_and_move(solys, body_calc, logger, (az_offset, ze_offset))
+        autohelper.read_and_move(solys, body_calc, logger, (az_offset, ze_offset))
         dt = datetime.datetime.now(datetime.timezone.utc)
         prev_az, prev_ze, _ = solys.get_current_position()
         qsi, total_intens, _ = solys.get_sun_intensity()
@@ -549,4 +548,4 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
             is_finished.value = True
         logger.info("Black finished and connection closed.")
     except Exception as e:
-        _exception_tracking(logger, e, solys, is_finished)
+        autohelper.exception_tracking(logger, e, solys, is_finished)
