@@ -22,7 +22,7 @@ from threading import Thread, Lock
 from . import autohelper
 from .. import solys2
 from .. import positioncalc as psc
-from .. import common as _common
+from .. import common
 
 """___Authorship___"""
 __author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
@@ -33,10 +33,10 @@ __email__ = "gaton@goa.uva.es"
 __status__ = "Development"
 
 def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: Lock,
-    cont_track: _common.ContainedBool, logger: logging.Logger, port: int = 15000,
-    password: str = "solys", is_finished: _common.ContainedBool = None,
+    cont_track: common.ContainedBool, logger: logging.Logger, port: int = 15000,
+    password: str = "solys", is_finished: common.ContainedBool = None,
     altitude: float = 0, kernels_path: str = "./kernels",
-    solys_delay: float = _common.SOLYS_APPROX_DELAY):
+    solys_delay: float = common.SOLYS_APPROX_DELAY):
     """
     Track a celestial body
 
@@ -132,10 +132,9 @@ class _BodyTracker:
         when the thread has successfully ended execution.
     """
     def __init__(self, ip: str, seconds: float, library: psc._BodyLibrary, port: int = 15000,
-        password: str = "solys", log: bool = False, logfile: str = "",
+        password: str = "solys", logger: logging.Logger = None,
         altitude: float = 0, kernels_path: str = "./kernels",
-        extra_log_handlers: List[logging.Handler] = [],
-        solys_delay: float = _common.SOLYS_APPROX_DELAY):
+        solys_delay: float = common.SOLYS_APPROX_DELAY):
         """
         Parameters
         ----------
@@ -150,63 +149,28 @@ class _BodyTracker:
             Access port. By default 15000.
         password : str
             Ethernet user password. By default is "solys".
-        log : bool
-            True if some logging is required. Otherwise silent. Default is silent.
-        logfile : str
-            Path of the file where the logging will be stored. In case that it's not used, it will be
-            printed in standard output error.
+        logger : Logger
+            Logger that will log out the log messages. If None, it will print them out on stderr
+            if they are level WARNING or higher.
         altitude : float
             Altitude in meters of the observer point. Used only if SPICE library is selected.
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
-        extra_log_handlers : list of logging.Handler
-            Custom handlers which the log will also log to.
         solys_delay : float
             Approximate delay in seconds between telling the Solys2 to move to a position and
             the Solys2 saying that it reached that position.
         """
         self.mutex_cont = Lock()
-        self.cont_track = _common.ContainedBool(True)
-        self._configure_logger(log, logfile, extra_log_handlers)
-        self._is_finished = _common.ContainedBool(False)
+        self.cont_track = common.ContainedBool(True)
+        if logger == None:
+            logger = common.create_default_logger()
+        self.logger = logger
+        self._is_finished = common.ContainedBool(False)
         # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, library, self.mutex_cont,
             self.cont_track, self.logger, port, password, self._is_finished, altitude,
             kernels_path, solys_delay))
-    
-    def _configure_logger(self, log: bool, logfile: str, extra_log_handlers: List[logging.Handler]):
-        """Configure the logging output
-        
-        Shell logging at warning level and file logger at debug level if log is True.
-
-        Parameters
-        ----------
-        log : bool
-            True if some logging is required. Otherwise silent except for warnings and errors.
-        logfile : str
-            Path of the file where the logging will be stored. In case that it's not used, it will be
-            printed in stderr.
-        extra_log_handlers : list of logging.Handler
-            Custom handlers which the log will also log to.
-        """
-        randstr = _common.gen_random_str(20)
-        logging.basicConfig(level=logging.WARNING)
-        for handler in logging.getLogger().handlers:
-            handler.setLevel(logging.WARNING)
-        self.logger = logging.getLogger('autotrack._BodyTracker-{}'.format(randstr))
-        for hand in extra_log_handlers:
-            self.logger.addHandler(hand)
-        if logfile != "":
-            log_handler = logging.FileHandler(logfile, mode='a')
-            log_handler.setFormatter(logging.Formatter('%(levelname)s:%(message)s'))
-            self.logger.addHandler(log_handler)
-            if log:
-                self.logger.setLevel(logging.DEBUG)
-        elif log:
-            logging.getLogger().setLevel(logging.DEBUG)
-            for handler in logging.getLogger().handlers:
-                handler.setLevel(logging.DEBUG)
 
     def start_tracking(self):
         """Start tracking the previously selected body."""
@@ -246,10 +210,9 @@ class MoonTracker(_BodyTracker):
     Solys2 so it tracks the Moon.
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
-        log: bool = False, logfile: str = "", library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
+        logger: logging.Logger = None, library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
         altitude: float = 0, kernels_path: str = "./kernels",
-        extra_log_handlers: List[logging.Handler] = [],
-        solys_delay: float = _common.SOLYS_APPROX_DELAY):
+        solys_delay: float = common.SOLYS_APPROX_DELAY):
         """
         Parameters
         ----------
@@ -262,11 +225,9 @@ class MoonTracker(_BodyTracker):
             Access port. By default 15000.
         password : str
             Ethernet user password. By default is "solys".
-        log : bool
-            True if some logging is required. Otherwise silent. Default is silent.
-        logfile : str
-            Path of the file where the logging will be stored. In case that it's not used, it will be
-            printed in standard output error.
+        logger : Logger
+            Logger that will log out the log messages. If None, it will print them out on stderr
+            if they are level WARNING or higher.
         library : MoonLibrary
             Lunar library that will be used to track the Moon. By default is ephem.
         altitude : float
@@ -274,14 +235,12 @@ class MoonTracker(_BodyTracker):
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
-        extra_log_handlers : list of logging.Handler
-            Custom handlers which the log will also log to.
         solys_delay : float
             Approximate delay in seconds between telling the Solys2 to move to a position and
             the Solys2 saying that it reached that position.
         """
-        super().__init__(ip, seconds, library, port, password, log, logfile, altitude,
-            kernels_path, extra_log_handlers, solys_delay)
+        super().__init__(ip, seconds, library, port, password, logger, altitude,
+            kernels_path, solys_delay)
 
 class SunTracker(_BodyTracker):
     """SunTracker
@@ -289,10 +248,9 @@ class SunTracker(_BodyTracker):
     Solys2 so it tracks the Sun.
     """
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
-        log: bool = False, logfile: str = "", library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
+        logger: logging.Logger = None, library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
         altitude: float = 0, kernels_path: str = "./kernels",
-        extra_log_handlers: List[logging.Handler] = [],
-        solys_delay: float = _common.SOLYS_APPROX_DELAY):
+        solys_delay: float = common.SOLYS_APPROX_DELAY):
         """
         Parameters
         ----------
@@ -305,11 +263,9 @@ class SunTracker(_BodyTracker):
             Access port. By default 15000.
         password : str
             Ethernet user password. By default is "solys".
-        log : bool
-            True if some logging is required. Otherwise silent. Default is silent.
-        logfile : str
-            Path of the file where the logging will be stored. In case that it's not used, it will be
-            printed in standard output error.
+        logger : Logger
+            Logger that will log out the log messages. If None, it will print them out on stderr
+            if they are level WARNING or higher.
         library : SunLibrary
             Solar library that will be used to track the Sun. By default is pysolar.
         altitude : float
@@ -317,11 +273,9 @@ class SunTracker(_BodyTracker):
         kernels_path : str
             Directory where the needed SPICE kernels are stored. Used only if SPICE library
             is selected.
-        extra_log_handlers : list of logging.Handler
-            Custom handlers which the log will also log to.
         solys_delay : float
             Approximate delay in seconds between telling the Solys2 to move to a position and
             the Solys2 saying that it reached that position.
         """
-        super().__init__(ip, seconds, library, port, password, log, logfile, altitude,
-            kernels_path, extra_log_handlers, solys_delay)
+        super().__init__(ip, seconds, library, port, password, logger, altitude,
+            kernels_path, solys_delay)

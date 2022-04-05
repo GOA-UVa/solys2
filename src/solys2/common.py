@@ -4,6 +4,8 @@ Module containing common constants, functions and datatypes.
 
 It exports the following functions:
     * gen_random_str: Generate a random str of the specified length.
+    * create_default_logger: Instantiate a simple logger.
+    * create_file_logger: Generate a file logger with extra log handlers.
 
 It exports the following classes:
     * ContainedBool: Dataclass that act as a container for bool type.
@@ -13,6 +15,8 @@ It exports the following classes:
 from dataclasses import dataclass
 import random
 import string
+import logging
+from typing import List
 
 """___Third-Party Modules___"""
 # import here
@@ -49,6 +53,59 @@ def gen_random_str(len: int) -> str:
     """
     return ''.join(random.choice(string.ascii_letters) for i in range(len))
 
+def create_default_logger() -> logging.Logger:
+    """
+    Instantiate a simple logger that will be the default one.
+
+    It will only log messages if they are level WARNING or higher.
+
+    Returns
+    -------
+    logger : logging.Logger
+        Generated Logger.
+    """
+    randstr = gen_random_str(20)
+    logging.basicConfig(level=logging.DEBUG)
+    for handler in logging.getLogger().handlers:
+        handler.setLevel(logging.WARNING)
+    logger = logging.getLogger('solys2-{}'.format(randstr))
+    return logger
+
+def create_file_logger(logfile: str, extra_log_handlers: List[logging.Handler]
+    ) -> logging.Logger:
+    """
+    Generate a file logger with extra log handlers.
+
+    Parameters
+    ----------
+    logfile : str
+        Path of the file where the logging will be stored. In case that it's not used, it will be
+        printed in stderr.
+    extra_log_handlers : list of logging.Handler
+        Custom handlers which the log will also log to.
+
+    Returns
+    -------
+    logger : logging.Logger
+        Generated Logger.
+    """
+    randstr = gen_random_str(20)
+    logging.basicConfig(level=logging.DEBUG)
+    for handler in logging.getLogger().handlers:
+        handler.setLevel(logging.WARNING)
+    logger = logging.getLogger('solys2-{}'.format(randstr))
+    for hand in extra_log_handlers:
+        logger.addHandler(hand)
+    if logfile != None and logfile != "":
+        log_handler = logging.FileHandler(logfile, mode='a')
+        log_handler.setFormatter(logging.Formatter('%(levelname)s:%(message)s'))
+        logger.addHandler(log_handler)
+        logger.setLevel(logging.DEBUG)
+    else:
+        logging.getLogger().setLevel(logging.DEBUG)
+        for handler in logging.getLogger().handlers:
+            handler.setLevel(logging.DEBUG)
+    return logger
 
 @dataclass
 class ContainedBool:

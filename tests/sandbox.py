@@ -80,7 +80,9 @@ def prueba_black():
 def prueba_track():
     #mt = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.SPICEDMOON, altitude=710, kernels_path="./kernels.temp.dir")
     handler = logging.StreamHandler()
-    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.PYSOLAR, altitude=710, kernels_path="./kernels.temp.dir",
+    #st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.SPICEDSUN, altitude=710, kernels_path="./kernels.temp.dir",
+    #    extra_log_handlers=[handler])
+    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.PYSOLAR,
         extra_log_handlers=[handler])
     st.start_tracking()
 

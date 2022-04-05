@@ -12,3 +12,7 @@ to start the tracking.
 - Automation common functionalities moved to module autohelper.
 - Automation modules moved to folder automation.
 - Created doc folder and stored component diagram.
+
+- BodyTracker gets the logger as a parameter, it doesn't generate it.
+- Default logger function moved to common module.
+- File logger function moved to common module.
