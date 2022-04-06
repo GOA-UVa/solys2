@@ -152,7 +152,7 @@ def read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: l
     """
     dt = datetime.datetime.now(datetime.timezone.utc)
     logger.info("UTC Datetime: {}.".format(dt))
-    check_time_solys = (dt.minute == 0 )
+    should_check_time_solys = (dt.minute == 0 )
     try:
         prev_az, prev_ze, _ = solys.get_current_position()
         qsi, total_intens, _ = solys.get_sun_intensity()
@@ -161,7 +161,7 @@ def read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: l
         az_adj, ze_adj, _ = solys.adjust()
         logger.debug("Adjustment of {} and {}.".format(az_adj, ze_adj))
         dt = datetime.datetime.now(datetime.timezone.utc)
-        if check_time_solys:
+        if should_check_time_solys:
             logger.debug("Checking computer time against Solys internal time.")
             check_time_solys(solys, logger)
         logger.info("Real UTC Datetime: {}".format(dt))

@@ -25,3 +25,6 @@ the functionality of _BodyTracker objects.
 it reconnects and tries again. It also reconnects if there are too many nones.
 
 - Corrected error where offset wasn't added.
+
+- Fixed bug check_time_solys func overwritten by variable. Variable now is
+should_check_time_solys.
