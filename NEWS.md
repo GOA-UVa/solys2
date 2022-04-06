@@ -23,3 +23,5 @@ the functionality of _BodyTracker objects.
 
 - Solys2 object, when sending a command if there is a ConnectionResetError or a BrokenPipeError
 it reconnects and tries again. It also reconnects if there are too many nones.
+
+- Corrected error where offset wasn't added in regular autotrack.
