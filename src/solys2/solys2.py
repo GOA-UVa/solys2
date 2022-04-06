@@ -40,6 +40,8 @@ _MAX_RELOGIN_RECURSION = 3
 
 _DEFAULT_VAL_ERR = -999
 
+_NONES_UNTIL_RECONNECT = 100
+
 @dataclass
 class CommandOutput:
     """
@@ -194,12 +196,23 @@ class Solys2:
             err = response.ErrorCode.E10.value
             raise _create_solys_exception(err)
         self.connection.empty_recv()
-        str_out = self.connection.send_cmd(cmd)
+        try:
+            str_out = self.connection.send_cmd(cmd)
+        except (ConnectionResetError, BrokenPipeError):
+            self.connect()
+            str_out = self.connection.send_cmd(cmd)
         nums, out, err = response.process_response(str_out, cmd)
+        none_quant = 0
         while out == response.OutCode.NONE:
             # The solys might return empty responses (or older responses) until it answers
             # the command.
-            time.sleep(0.1)
+            if none_quant > _NONES_UNTIL_RECONNECT:
+                # If there are only nones, it's probably disconnected.
+                self.connect()
+                none_quant = 0
+            else:
+                none_quant += 1
+                time.sleep(0.1)
             str_out = self.connection.recv_msg()
             nums, out, err = response.process_response(str_out, cmd)
         if out == response.OutCode.ERROR:

@@ -20,3 +20,6 @@ to start the tracking.
 - File logger and default logger creation functions accept level as a parameter.
 - Removed cross and mesh solar and lunar functions, created objects instead, imitating
 the functionality of _BodyTracker objects.
+
+- Solys2 object, when sending a command if there is a ConnectionResetError or a BrokenPipeError
+it reconnects and tries again. It also reconnects if there are too many nones.
