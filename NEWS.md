@@ -16,3 +16,7 @@ to start the tracking.
 - BodyTracker gets the logger as a parameter, it doesn't generate it.
 - Default logger function moved to common module.
 - File logger function moved to common module.
+
+- File logger and default logger creation functions accept level as a parameter.
+- Removed cross and mesh solar and lunar functions, created objects instead, imitating
+the functionality of _BodyTracker objects.

@@ -53,11 +53,16 @@ def gen_random_str(len: int) -> str:
     """
     return ''.join(random.choice(string.ascii_letters) for i in range(len))
 
-def create_default_logger() -> logging.Logger:
+def create_default_logger(level: int = logging.WARNING) -> logging.Logger:
     """
     Instantiate a simple logger that will be the default one.
 
-    It will only log messages if they are level WARNING or higher.
+    By default it will only log messages if they are level WARNING or higher.
+
+    Parameters
+    ----------
+    level : int
+        Log level that will be logged out.
 
     Returns
     -------
@@ -67,12 +72,12 @@ def create_default_logger() -> logging.Logger:
     randstr = gen_random_str(20)
     logging.basicConfig(level=logging.DEBUG)
     for handler in logging.getLogger().handlers:
-        handler.setLevel(logging.WARNING)
+        handler.setLevel(level)
     logger = logging.getLogger('solys2-{}'.format(randstr))
     return logger
 
-def create_file_logger(logfile: str, extra_log_handlers: List[logging.Handler]
-    ) -> logging.Logger:
+def create_file_logger(logfile: str, extra_log_handlers: List[logging.Handler] = [],
+    level: int = logging.DEBUG) -> logging.Logger:
     """
     Generate a file logger with extra log handlers.
 
@@ -83,6 +88,8 @@ def create_file_logger(logfile: str, extra_log_handlers: List[logging.Handler]
         printed in stderr.
     extra_log_handlers : list of logging.Handler
         Custom handlers which the log will also log to.
+    level : int
+        Log level that will be logged out.
 
     Returns
     -------
@@ -92,7 +99,7 @@ def create_file_logger(logfile: str, extra_log_handlers: List[logging.Handler]
     randstr = gen_random_str(20)
     logging.basicConfig(level=logging.DEBUG)
     for handler in logging.getLogger().handlers:
-        handler.setLevel(logging.WARNING)
+        handler.setLevel(level)
     logger = logging.getLogger('solys2-{}'.format(randstr))
     for hand in extra_log_handlers:
         logger.addHandler(hand)
@@ -104,7 +111,7 @@ def create_file_logger(logfile: str, extra_log_handlers: List[logging.Handler]
     else:
         logging.getLogger().setLevel(logging.DEBUG)
         for handler in logging.getLogger().handlers:
-            handler.setLevel(logging.DEBUG)
+            handler.setLevel(level)
     return logger
 
 @dataclass

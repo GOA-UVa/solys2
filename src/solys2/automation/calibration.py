@@ -2,6 +2,20 @@
 
 This module contains the functionalities related to different calibration methods,
 most of them used by the GOA-UVa.
+
+It exports the following classes:
+    * LunarCross : Object that when created will create a thread executing the function of controlling the
+        Solys2 so it performs a cross over the Moon.
+    * SolarCross : Object that when created will create a thread executing the function of controlling the
+        Solys2 so it performs a cross over the Sun.
+    * LunarMesh : Object that when created will create a thread executing the function of controlling the
+        Solys2 so it performs a mesh over the Moon.
+    * SolarMesh : Object that when created will create a thread executing the function of controlling the
+        Solys2 so it performs a mesh over the Sun.
+
+It exports the following functions:
+    * black_moon : Perform a black for the moon. Point to a position where the moon is not present so the noise
+        can be calculated. (Opposite azimuth and zenith = 45).
 """
 
 """___Built-In Modules___"""
@@ -10,7 +24,7 @@ from typing import Tuple, List
 import time
 import datetime
 import logging
-from threading import Lock
+from threading import Lock, Thread
 
 """___Third-Party Modules___"""
 import numpy as np
@@ -19,7 +33,7 @@ import numpy as np
 from .. import solys2
 from .. import positioncalc as psc
 from . import autohelper
-from .. import common as _common
+from .. import common
 
 @dataclass
 class CrossParameters:
@@ -59,10 +73,10 @@ class CrossParameters:
 
 def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
     offsets: List[Tuple[float, float]], body_calc: psc.BodyCalculator, cp: CrossParameters,
-    mutex_cont: Lock = None, cont_track: _common.ContainedBool = None,
-    solys_delay: float = _common.SOLYS_APPROX_DELAY,
-    solys_delay_margin: float = _common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = _common.ASD_DELAY):
+    mutex_cont: Lock = None, cont_track: common.ContainedBool = None,
+    solys_delay: float = common.SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+    instrument_delay: float = common.ASD_DELAY):
     """
     Perform a series of solys-synchronized offsets over a body, for the cross and mesh.
 
@@ -113,7 +127,7 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
         sleep_time0 = cp.countdown
         tf = time.time()
         diff_td = tf - t0
-        wait_time = (dt_offset - _common.ASD_DELAY/2.0) - (diff_td + sleep_time0)
+        wait_time = (dt_offset - common.ASD_DELAY/2.0) - (diff_td + sleep_time0)
         if wait_time > 0:
             logger.debug("Sleeping {} seconds".format(wait_time))
             time.sleep(wait_time)
@@ -128,11 +142,11 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
 
 def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
     cross_params: CrossParameters, port: int = 15000, password: str = "solys",
-    is_finished: _common.ContainedBool = None, altitude: float = 0,
+    is_finished: common.ContainedBool = None, altitude: float = 0,
     kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _common.ContainedBool = None, solys_delay: float = _common.SOLYS_APPROX_DELAY,
-    solys_delay_margin: float = _common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = _common.ASD_DELAY):
+    cont_track: common.ContainedBool = None, solys_delay: float = common.SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+    instrument_delay: float = common.ASD_DELAY):
     """
     Perform a cross over a body
 
@@ -207,115 +221,201 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
     except Exception as e:
         autohelper.exception_tracking(logger, e, solys, is_finished)
 
-def lunar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _common.ContainedBool = None,
-    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
-    kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _common.ContainedBool = None, solys_delay: float = _common.SOLYS_APPROX_DELAY,
-    solys_delay_margin: float = _common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = _common.ASD_DELAY):
-    """
-    Perform a cross over the Moon
+class _BodyCross:
+    """_BodyCross
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it performs a cross over the selected body.
 
-    Parameters
+    Attributes
     ----------
-    ip : str
-        IP of the solys.
-    logger : logging.Logger
-        Logger that will log out the log messages
-    cross_params : CrossParameters
-        Parameters needed when performing a cross over a Body.
-    port : int
-        Access port. By default 15000.
-    password : str
-        Ethernet user password. By default is "solys".
-    is_finished : ContainedBool
-        Container for the boolean value that initially will be False, but it should be changed
-        to True when exiting the function.
-    library : MoonLibrary
-        Lunar library that will be used to track the Moon. By default is ephem.
-    altitude : float
-        Altitude in meters of the observer point. Used only if SPICE library is selected.
-    kernels_path : str
-        Directory where the needed SPICE kernels are stored. Used only if SPICE library
-        is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
     cont_track : ContainedBool
-        Container for the boolean value that represents if the tracking must stop or if it should
+        Container for the boolean value that represents if the thread must stop or if it should
         continue.
-    solys_delay : float
-        Approximate delay in seconds between telling the Solys2 to move to a position and
-        the Solys2 saying that it reached that position.
-    solys_delay_margin : float
-        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
-        Solys2 to move to a position and confirm that it has reached it, since the moment when
-        the "move position" command was sent, (for most cases).
-    instrument_delay : float
-        Approximate time in seconds that the measure instrument takes in each measurement.
-    """
-    return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
-        instrument_delay)
-
-def solar_cross(ip: str, logger: logging.Logger, cross_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _common.ContainedBool = None,
-    library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
-    kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _common.ContainedBool = None, solys_delay: float = _common.SOLYS_APPROX_DELAY,
-    solys_delay_margin: float = _common.SOLYS_DELAY_MARGIN, instrument_delay: float = _common.ASD_DELAY):
-    """
-    Perform a cross over the Sun
-
-    Parameters
-    ----------
-    ip : str
-        IP of the solys.
     logger : logging.Logger
-        Logger that will log out the log messages
-    cross_params : CrossParameters
-        Parameters needed when performing a cross over a Body.
-    port : int
-        Access port. By default 15000.
-    password : str
-        Ethernet user password. By default is "solys".
-    is_finished : ContainedBool
-        Container for the boolean value that initially will be False, but it should be changed
-        to True when exiting the function.
-    library : SunLibrary
-        Solar library that will be used to track the Sun. By default is pysolar.
-    altitude : float
-        Altitude in meters of the observer point. Used only if SPICE library is selected.
-    kernels_path : str
-        Directory where the needed SPICE kernels are stored. Used only if SPICE library
-        is selected.
-    mutex_cont : Lock
-        Mutex that controls the access to the variable cont_track
-    cont_track : ContainedBool
-        Container for the boolean value that represents if the tracking must stop or if it should
-        continue.
-    solys_delay : float
-        Approximate delay in seconds between telling the Solys2 to move to a position and
-        the Solys2 saying that it reached that position.
-    solys_delay_margin : float
-        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
-        Solys2 to move to a position and confirm that it has reached it, since the moment when
-        the "move position" command was sent, (for most cases).
-    instrument_delay : float
-        Approximate time in seconds that the measure instrument takes in each measurement.
+        Logger that will log out the log messages.
+    thread : Thread
+        Thread that will execute the cross function.
+    _is_finished : ContainedBool
+        Container for the boolean value that initially will be False, but it will be True
+        when the thread has successfully ended execution.
     """
-    return _cross_body(ip, library, logger, cross_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
-        instrument_delay)
+    def __init__(self, ip: str, cross_params: CrossParameters, library: psc._BodyLibrary,
+        logger: logging.Logger = None, port: int = 15000, password: str = "solys",
+        altitude: float = 0, kernels_path: str = "./kernels",
+        solys_delay: float = common.SOLYS_APPROX_DELAY,
+        solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+        instrument_delay: float = common.ASD_DELAY):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        cross_params : CrossParameters
+            Parameters needed when performing a cross over a Body.
+        library : _BodyLibrary
+            Body library that will be used to track the body. Moon or Sun.
+        logger : logging.Logger
+            Logger that will log out the log messages
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
+        solys_delay : float
+            Approximate delay in seconds between telling the Solys2 to move to a position and
+            the Solys2 saying that it reached that position.
+        solys_delay_margin : float
+            Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+            Solys2 to move to a position and confirm that it has reached it, since the moment when
+            the "move position" command was sent, (for most cases).
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
+        """
+        self.mutex_cont = Lock()
+        self.cont_track = common.ContainedBool(True)
+        if logger == None:
+            logger = common.create_default_logger()
+        self.logger = logger
+        self._is_finished = common.ContainedBool(False)
+        # Create thread
+        self.thread = Thread(target = _cross_body, args = (ip, library, self.logger, cross_params,
+            port, password, self._is_finished, altitude, kernels_path, self.mutex_cont,
+            self.cont_track, solys_delay, solys_delay_margin, instrument_delay))
+    
+    def start_cross(self):
+        """Start the cross for the previously selected body."""
+        self.thread.start()
+    
+    def stop_cross(self):
+        """
+        Stop the cross over the selected body. The connection with the Solys2 will be closed and
+        the thread stopped.
+
+        It won't be stopped immediately, at most there will be a delay of some seconds.
+        """
+        self.mutex_cont.acquire()
+        self.cont_track.value = False
+        self.mutex_cont.release()
+        handlers = self.logger.handlers
+        for handler in handlers:
+            handler.close()
+            self.logger.removeHandler(handler)
+    
+    def is_finished(self) -> bool:
+        """
+        Check if the thread has successfully finished executing.
+
+        Returns
+        -------
+        has_finished : bool
+            True if it has finished successfully.
+        """
+        return self._is_finished.value
+
+class LunarCross(_BodyCross):
+    """LunarCross
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it performs a cross over the Moon.
+    """
+    def __init__(self, ip: str, cross_params: CrossParameters,
+        library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
+        logger: logging.Logger = None, port: int = 15000, password: str = "solys",
+        altitude: float = 0, kernels_path: str = "./kernels",
+        solys_delay: float = common.SOLYS_APPROX_DELAY,
+        solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+        instrument_delay: float = common.ASD_DELAY):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        cross_params : CrossParameters
+            Parameters needed when performing a cross over a Body.
+        library : MoonLibrary
+            Lunar library that will be used to track the Moon.
+        logger : logging.Logger
+            Logger that will log out the log messages
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
+        solys_delay : float
+            Approximate delay in seconds between telling the Solys2 to move to a position and
+            the Solys2 saying that it reached that position.
+        solys_delay_margin : float
+            Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+            Solys2 to move to a position and confirm that it has reached it, since the moment when
+            the "move position" command was sent, (for most cases).
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
+        """
+        super().__init__(ip, cross_params, library, logger, port, password, altitude,
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
+
+class SolarCross(_BodyCross):
+    """SolarCross
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it performs a cross over the Sun.
+    """
+    def __init__(self, ip: str, cross_params: CrossParameters,
+        library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
+        logger: logging.Logger = None, port: int = 15000, password: str = "solys",
+        altitude: float = 0, kernels_path: str = "./kernels",
+        solys_delay: float = common.SOLYS_APPROX_DELAY,
+        solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+        instrument_delay: float = common.ASD_DELAY):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        cross_params : CrossParameters
+            Parameters needed when performing a cross over a Body.
+        library : SunLibrary
+            Lunar library that will be used to track the Sun.
+        logger : logging.Logger
+            Logger that will log out the log messages
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
+        solys_delay : float
+            Approximate delay in seconds between telling the Solys2 to move to a position and
+            the Solys2 saying that it reached that position.
+        solys_delay_margin : float
+            Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+            Solys2 to move to a position and confirm that it has reached it, since the moment when
+            the "move position" command was sent, (for most cases).
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
+        """
+        super().__init__(ip, cross_params, library, logger, port, password, altitude,
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
 
 def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_params: CrossParameters,
-    port: int = 15000, password: str = "solys", is_finished: _common.ContainedBool = None,
+    port: int = 15000, password: str = "solys", is_finished: common.ContainedBool = None,
     altitude: float = 0, kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _common.ContainedBool = None, solys_delay: float = _common.SOLYS_APPROX_DELAY,
-    solys_delay_margin: float = _common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = _common.ASD_DELAY):
+    cont_track: common.ContainedBool = None, solys_delay: float = common.SOLYS_APPROX_DELAY,
+    solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+    instrument_delay: float = common.ASD_DELAY):
     """
-    Perform a mesh over a body
+    Perform a mesh/matrix over a body
 
     Parameters
     ----------
@@ -389,110 +489,195 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
     except Exception as e:
         autohelper.exception_tracking(logger, e, solys, is_finished)
 
-def lunar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _common.ContainedBool = None,
-    library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
-    kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _common.ContainedBool = None, solys_delay: float = _common.SOLYS_APPROX_DELAY,
-    solys_delay_margin: float = _common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = _common.ASD_DELAY):
-    """
-    Perform a mesh over the Moon
+class _BodyMesh:
+    """_BodyMesh
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it performs a mesh/matrix over the selected body.
 
-    Parameters
+    Attributes
     ----------
-    ip : str
-        IP of the solys.
-    logger : logging.Logger
-        Logger that will log out the log messages
-    mesh_params : CrossParameters
-        Parameters needed when performing a mesh over a Body.
-    port : int
-        Access port. By default 15000.
-    password : str
-        Ethernet user password. By default is "solys".
-    is_finished : ContainedBool
-        Container for the boolean value that initially will be False, but it should be changed
-        to True when exiting the function.
-    library : MoonLibrary
-        Lunar library that will be used to track the Moon. By default is ephem.
-    altitude : float
-        Altitude in meters of the observer point. Used only if SPICE library is selected.
-    kernels_path : str
-        Directory where the needed SPICE kernels are stored. Used only if SPICE library
-        is selected.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track
     cont_track : ContainedBool
-        Container for the boolean value that represents if the tracking must stop or if it should
+        Container for the boolean value that represents if the thread must stop or if it should
         continue.
-    solys_delay : float
-        Approximate delay in seconds between telling the Solys2 to move to a position and
-        the Solys2 saying that it reached that position.
-    solys_delay_margin : float
-        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
-        Solys2 to move to a position and confirm that it has reached it, since the moment when
-        the "move position" command was sent, (for most cases).
-    instrument_delay : float
-        Approximate time in seconds that the measure instrument takes in each measurement.
-    """
-    return _mesh_body(ip, library, logger, mesh_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
-        instrument_delay)
-
-def solar_mesh(ip: str, logger: logging.Logger, mesh_params: CrossParameters, port: int = 15000,
-    password: str = "solys", is_finished: _common.ContainedBool = None,
-    library: psc.SunLibrary = psc.SunLibrary.PYSOLAR, altitude: float = 0,
-    kernels_path: str = "./kernels", mutex_cont: Lock = None,
-    cont_track: _common.ContainedBool = None, solys_delay: float = _common.SOLYS_APPROX_DELAY,
-    solys_delay_margin: float = _common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = _common.ASD_DELAY):
-    """
-    Perform a mesh over the Sun
-
-    Parameters
-    ----------
-    ip : str
-        IP of the solys.
     logger : logging.Logger
-        Logger that will log out the log messages
-    mesh_params : CrossParameters
-        Parameters needed when performing a mesh over a Body.
-    port : int
-        Access port. By default 15000.
-    password : str
-        Ethernet user password. By default is "solys".
-    is_finished : ContainedBool
-        Container for the boolean value that initially will be False, but it should be changed
-        to True when exiting the function.
-    library : SunLibrary
-        Solar library that will be used to track the Sun. By default is pysolar.
-    altitude : float
-        Altitude in meters of the observer point. Used only if SPICE library is selected.
-    kernels_path : str
-        Directory where the needed SPICE kernels are stored. Used only if SPICE library
-        is selected.
-    mutex_cont : Lock
-        Mutex that controls the access to the variable cont_track
-    cont_track : ContainedBool
-        Container for the boolean value that represents if the tracking must stop or if it should
-        continue.
-    solys_delay : float
-        Approximate delay in seconds between telling the Solys2 to move to a position and
-        the Solys2 saying that it reached that position.
-    solys_delay_margin : float
-        Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
-        Solys2 to move to a position and confirm that it has reached it, since the moment when
-        the "move position" command was sent, (for most cases).
-    instrument_delay : float
-        Approximate time in seconds that the measure instrument takes in each measurement.
+        Logger that will log out the log messages.
+    thread : Thread
+        Thread that will execute the cross function.
+    _is_finished : ContainedBool
+        Container for the boolean value that initially will be False, but it will be True
+        when the thread has successfully ended execution.
     """
-    return _mesh_body(ip, library, logger, mesh_params, port, password, is_finished,
-        altitude, kernels_path, mutex_cont, cont_track, solys_delay, solys_delay_margin,
-        instrument_delay)
+    def __init__(self, ip: str, mesh_params: CrossParameters, library: psc._BodyLibrary,
+        logger: logging.Logger = None, port: int = 15000, password: str = "solys",
+        altitude: float = 0, kernels_path: str = "./kernels",
+        solys_delay: float = common.SOLYS_APPROX_DELAY,
+        solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+        instrument_delay: float = common.ASD_DELAY):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        mesh_params : CrossParameters
+            Parameters needed when performing a mesh/matrix over a Body.
+        library : _BodyLibrary
+            Body library that will be used to track the body. Moon or Sun.
+        logger : logging.Logger
+            Logger that will log out the log messages
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
+        solys_delay : float
+            Approximate delay in seconds between telling the Solys2 to move to a position and
+            the Solys2 saying that it reached that position.
+        solys_delay_margin : float
+            Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+            Solys2 to move to a position and confirm that it has reached it, since the moment when
+            the "move position" command was sent, (for most cases).
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
+        """
+        self.mutex_cont = Lock()
+        self.cont_track = common.ContainedBool(True)
+        if logger == None:
+            logger = common.create_default_logger()
+        self.logger = logger
+        self._is_finished = common.ContainedBool(False)
+        # Create thread
+        self.thread = Thread(target = _mesh_body, args = (ip, library, self.logger, mesh_params,
+            port, password, self._is_finished, altitude, kernels_path, self.mutex_cont,
+            self.cont_track, solys_delay, solys_delay_margin, instrument_delay))
+    
+    def start_mesh(self):
+        """Start the mesh for the previously selected body."""
+        self.thread.start()
+    
+    def stop_mesh(self):
+        """
+        Stop the mesh over the selected body. The connection with the Solys2 will be closed and
+        the thread stopped.
+
+        It won't be stopped immediately, at most there will be a delay of some seconds.
+        """
+        self.mutex_cont.acquire()
+        self.cont_track.value = False
+        self.mutex_cont.release()
+        handlers = self.logger.handlers
+        for handler in handlers:
+            handler.close()
+            self.logger.removeHandler(handler)
+    
+    def is_finished(self) -> bool:
+        """
+        Check if the thread has successfully finished executing.
+
+        Returns
+        -------
+        has_finished : bool
+            True if it has finished successfully.
+        """
+        return self._is_finished.value
+
+class LunarMesh(_BodyMesh):
+    """LunarMesh
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it performs a mesh/matrix over the Moon.
+    """
+    def __init__(self, ip: str, mesh_params: CrossParameters,
+        library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
+        logger: logging.Logger = None, port: int = 15000, password: str = "solys",
+        altitude: float = 0, kernels_path: str = "./kernels",
+        solys_delay: float = common.SOLYS_APPROX_DELAY,
+        solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+        instrument_delay: float = common.ASD_DELAY):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        mesh_params : CrossParameters
+            Parameters needed when performing a mesh/matrix over a Body.
+        library : MoonLibrary
+            Moon library that will be used to track the Moon.
+        logger : logging.Logger
+            Logger that will log out the log messages
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
+        solys_delay : float
+            Approximate delay in seconds between telling the Solys2 to move to a position and
+            the Solys2 saying that it reached that position.
+        solys_delay_margin : float
+            Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+            Solys2 to move to a position and confirm that it has reached it, since the moment when
+            the "move position" command was sent, (for most cases).
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
+        """
+        super().__init__(ip, mesh_params, library, logger, port, password, altitude,
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
+
+class SolarMesh(_BodyMesh):
+    """SolarMesh
+    Object that when created will create a thread executing the function of controlling the
+    Solys2 so it performs a mesh/matrix over the Sun.
+    """
+    def __init__(self, ip: str, mesh_params: CrossParameters,
+        library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
+        logger: logging.Logger = None, port: int = 15000, password: str = "solys",
+        altitude: float = 0, kernels_path: str = "./kernels",
+        solys_delay: float = common.SOLYS_APPROX_DELAY,
+        solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
+        instrument_delay: float = common.ASD_DELAY):
+        """
+        Parameters
+        ----------
+        ip : str
+            IP of the solys.
+        mesh_params : CrossParameters
+            Parameters needed when performing a mesh/matrix over a Body.
+        library : SunLibrary
+            Sun library that will be used to track the Sun.
+        logger : logging.Logger
+            Logger that will log out the log messages
+        port : int
+            Access port. By default 15000.
+        password : str
+            Ethernet user password. By default is "solys".
+        altitude : float
+            Altitude in meters of the observer point. Used only if SPICE library is selected.
+        kernels_path : str
+            Directory where the needed SPICE kernels are stored. Used only if SPICE library
+            is selected.
+        solys_delay : float
+            Approximate delay in seconds between telling the Solys2 to move to a position and
+            the Solys2 saying that it reached that position.
+        solys_delay_margin : float
+            Time margin in seconds where solys_delay + solys_delay_margin = enough time for the
+            Solys2 to move to a position and confirm that it has reached it, since the moment when
+            the "move position" command was sent, (for most cases).
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
+        """
+        super().__init__(ip, mesh_params, library, logger, port, password, altitude,
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
 
 def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
-    password: str = "solys", is_finished: _common.ContainedBool = None,
+    password: str = "solys", is_finished: common.ContainedBool = None,
     library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON, altitude: float = 0,
     kernels_path: str = "./kernels"):
     """

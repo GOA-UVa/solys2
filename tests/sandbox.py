@@ -8,7 +8,9 @@ import logging
 
 from solys2 import solys2 as s2
 from solys2.automation import autotrack as aut
+from solys2.automation import calibration as cali
 from solys2 import positioncalc as psc
+from solys2 import common
 
 TCP_IP = "localhost" #"157.88.43.171"
 TCP_PORT = 15000
@@ -67,23 +69,24 @@ def pruebas_comandos_raw():
     s.close()
 
 def prueba_cross():
-    cp = aut.CrossParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 3)
-    logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger("sandbox")
-    aut.solar_cross(TCP_IP, logger, cp, TCP_PORT, "solys", library=psc.SunLibrary.SPICEDSUN, altitude=710, kernels_path="./kernels.temp.dir")
+    cp = cali.CrossParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 3)
+    logger = common.create_default_logger(logging.DEBUG)
+    library=psc.SunLibrary.SPICEDSUN
+    sc = cali.SolarCross(TCP_IP, cp, library, logger, altitude=710, kernels_path="./kernels.temp.dir")
+    sc.start_cross()
 
 def prueba_black():
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger("sandbox")
-    aut.black_moon(TCP_IP, logger, library=psc.MoonLibrary.PYLUNAR)
+    cali.black_moon(TCP_IP, logger, library=psc.MoonLibrary.PYLUNAR)
 
 def prueba_track():
     #mt = aut.MoonTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.MoonLibrary.SPICEDMOON, altitude=710, kernels_path="./kernels.temp.dir")
-    handler = logging.StreamHandler()
+    # handler = logging.StreamHandler()
     #st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.SPICEDSUN, altitude=710, kernels_path="./kernels.temp.dir",
     #    extra_log_handlers=[handler])
-    st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.PYSOLAR,
-        extra_log_handlers=[handler])
+    logger = common.create_default_logger(logging.DEBUG)
+    st = aut.SunTracker(TCP_IP, 15, library=psc.SunLibrary.PYSOLAR, logger=logger)
     st.start_tracking()
 
 def main():
