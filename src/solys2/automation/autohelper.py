@@ -158,7 +158,8 @@ def read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: l
         qsi, total_intens, _ = solys.get_sun_intensity()
         logger.info("Current Position: Azimuth: {}, Zenith: {}.".format(prev_az, prev_ze))
         logger.info("Quadrants: {}. Total intensity: {}.".format(qsi, total_intens))
-        off_az, off_ze, _ = solys.adjust()
+        az_adj, ze_adj, _ = solys.adjust()
+        logger.debug("Adjustment of {} and {}.".format(az_adj, ze_adj))
         dt = datetime.datetime.now(datetime.timezone.utc)
         if check_time_solys:
             logger.debug("Checking computer time against Solys internal time.")
@@ -167,14 +168,14 @@ def read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: l
         dt = dt + datetime.timedelta(0, datetime_offset)
         logger.info("Position UTC Datetime: {}".format(dt))
         az, ze = body_calc.get_position(dt)
-        new_az = min(360, az + offset[0] + off_az)
-        new_ze = min(90, ze + offset[1] + off_ze)
+        new_az = min(360, az + offset[0])
+        new_ze = min(90, ze + offset[1])
         solys.set_azimuth(new_az)
         solys.set_zenith(new_ze)
         logger.info("Sent positions:")
-        logger.info("Azimuth: {} + {} + {} ({}).\nZenith: {} + {} + {} ({}).\n".format(az,
-            offset[0], off_az, new_az, ze, offset[1], off_ze, new_ze))
-        wait_position_reached(solys, new_az, new_ze, logger)
+        logger.info("Azimuth: {} + {} + ({}).\nZenith: {} + {} + ({}).\n".format(az,
+            offset[0], new_az, ze, offset[1], new_ze))
+        wait_position_reached(solys, new_az+az_adj, new_ze+ze_adj, logger)
         dt = datetime.datetime.now(datetime.timezone.utc)
         logger.info("Finished moving at UTC datetime: {}.".format(dt))
     except solys2.SolysException as e:
