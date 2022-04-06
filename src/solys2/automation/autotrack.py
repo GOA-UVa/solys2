@@ -95,9 +95,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         while cont_track.value:
             mutex_cont.release()
             logger.debug("Waited {} seconds.\n".format(sleep_time))
-            off_az, off_ze, _ = solys.adjust()
-            offset = (off_az, off_ze)
-            autohelper.read_and_move(solys, body_calc, logger, offset, time_offset)
+            autohelper.read_and_move(solys, body_calc, logger, datetime_offset=time_offset)
             tf = time.time()
             tdiff = tf - t0
             sleep_time = (seconds - tdiff)
