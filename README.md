@@ -16,6 +16,11 @@ The official Kipp & Zonen website can be found at [kippzonen.com](https://kippzo
 The names SOLYS2 and Kipp & Zonen as well as related names, marks, emblems and images are
 registered trademarks of their respective owners.
 
+## About
+
+This software was initially developed by GOA-UVa (the Atmospheric Optics Group of Valladolid
+University) for a campaign at the Izaña Atmospheric Observatory.
+
 ## Requirements
 
 - python>=3.8
@@ -69,9 +74,55 @@ st.start_tracking()
 st.stop_tracking()
 ```
 
-## SPICE
+## Structure
 
-### Kernels
+The package is composed of different modules:
+- **connection**: Module that encapsulates and abstracts functions that allow the low-level communication
+with the Solys2.
+- **response**: Module that contains functionalities for processing the Solys2 responses.
+- **solys2**: Module that encapsulates and abstracts an interface for interacting with the Solys2.
+- **positioncalc**: Module that contains the objects that allow the calculation of the position of the moon
+and the sun using different libraries, like ephem, pysolar or SPICE (spicedmoon and spicedsun).
+- **common**: Module containing common constants, functions and datatypes.
+- **autohelper**: Module that contains the functionalities that are used for performing automatic actions
+with the Solys2.
+- **autotrack**: Module that contains the functionalities of performing automatic actions with the Solys2.
+- **calibration**: This module contains the functionalities related to different calibration methods,
+most of them used by the GOA-UVa.
+
+The main modules that can be used are the module **solys2**, which allowes the user to interact
+with the SOLYS2 easily, and **autotrack** and **calibration**, which let the user perform automated
+functions like tracking the moon or performing a calibration cross over the moon.
+
+![Component diagram](./doc/solys2_components.png)
+
+## Libraries
+
+In the automation module the user can choose which library to use in the calculations of the selected
+body's data.
+
+These libraries are the following:
+
+For the Sun:
+- **spicedsun**: Library that uses NASA's data. The most exact one, but requires the presence of kernels files.
+- **pysolar**: Library that is very close to the correct data from SPICE, and doesn't require the presence of extra
+files. This is the default one. The errors are related to the sunrise and sunset.
+- **ephem**: Library that is also close to the correct data from SPICE, but not as much as pysolar. The errors
+are related to the sunrise and sunset.
+
+
+For the Moon:
+- **spicedmoon**: Library that uses NASA's data. The most exact one, but requires the presence of kernels files.
+- **ephem**: Library that is very close to the correct data from SPICE, and doesn't require the presence of extra
+files. This is the default one, although the error might be too big for some users.
+- **pylunar**: Library that is very incorrect for some punctual data. Usage not recommended.
+
+### SPICE
+
+SPICE is a toolkit created by the NASA's team NAIF, which contains a lot of functionalities that
+help in the calculations of spatial data. The SPICE toolkit has been used in two
+python libraries for the calculation of solar and lunar data: spicedsun and spicedmoon
+respectively.
 
 In order to use the SPICE libraries, a directory with all the kernels must be specified.
 
