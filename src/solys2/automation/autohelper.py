@@ -27,7 +27,7 @@ import logging
 """___Solys2 Modules___"""
 from .. import response
 from .. import solys2
-from .. import positioncalc as psc
+from . import positioncalc as psc
 from .. import common as _common
 
 """___Authorship___"""

@@ -9,7 +9,7 @@ import logging
 from solys2 import solys2 as s2
 from solys2.automation import autotrack as aut
 from solys2.automation import calibration as cali
-from solys2 import positioncalc as psc
+from solys2.automation import positioncalc as psc
 from solys2 import common
 
 TCP_IP = "localhost" #"157.88.43.171"

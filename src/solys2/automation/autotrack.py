@@ -21,7 +21,7 @@ from threading import Thread, Lock
 """___Solys2 Modules___"""
 from . import autohelper
 from .. import solys2
-from .. import positioncalc as psc
+from . import positioncalc as psc
 from .. import common
 
 """___Authorship___"""

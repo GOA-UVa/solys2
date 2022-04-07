@@ -31,7 +31,7 @@ import numpy as np
 
 """___Solys2 Modules___"""
 from .. import solys2
-from .. import positioncalc as psc
+from . import positioncalc as psc
 from . import autohelper
 from .. import common
 

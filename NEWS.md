@@ -30,3 +30,5 @@ it reconnects and tries again. It also reconnects if there are too many nones.
 should_check_time_solys.
 
 - Added support for python3.7, although spiceypy might not work.
+
+- Positioncalc module moved into automation
