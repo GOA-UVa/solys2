@@ -127,12 +127,25 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
         sleep_time0 = cp.countdown
         tf = time.time()
         diff_td = tf - t0
-        wait_time = (dt_offset - common.ASD_DELAY/2.0) - (diff_td + sleep_time0)
+        wait_time = (dt_offset - instrument_delay/2.0) - (diff_td + sleep_time0)
         if wait_time > 0:
             logger.debug("Sleeping {} seconds".format(wait_time))
             time.sleep(wait_time)
+        else:
+            # If it waited too much time, that time is substracted from the countdown
+            final_sleep_time0 = sleep_time0 + wait_time # wait_time is negative
+            sleep_time0 = int(final_sleep_time0)
+            sleep_mid = final_sleep_time0-sleep_time0
+            logger.warning("The Solys2 spent more time moving than expected, reducing the \
+countdown to {}, and sleeping an extra {}.".format(sleep_time0, sleep_mid))
+            if final_sleep_time0 > 0:
+                time.sleep(sleep_mid)
+            else:
+                error_msg = "The difference between the Solys2 delay and actual delay is too \
+large. Increase the countdown or the values of the solys2 delay parameters."
+                raise Exception(error_msg)
         for i in range(sleep_time0):
-            logger.warn("COUNTDOWN:{}".format(sleep_time0-i))
+            logger.warning("COUNTDOWN:{}".format(sleep_time0-i))
             time.sleep(1)
         logger.warn("COUNTDOWN:0")
         sleep_time1 = cp.post_wait

@@ -32,3 +32,6 @@ should_check_time_solys.
 - Added support for python3.7, although spiceypy might not work.
 
 - Positioncalc module moved into automation
+
+- Calibration takes away time of countdown in case solys delay was too big, and even raises an
+error if it's too big even with the countdown.
