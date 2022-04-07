@@ -69,11 +69,11 @@ def pruebas_comandos_raw():
     s.close()
 
 def prueba_cross():
-    cp = cali.CrossParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 3)
+    cp = cali.CalibrationParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 3)
     logger = common.create_default_logger(logging.DEBUG)
     library=psc.SunLibrary.PYSOLAR
     sc = cali.SolarCross(TCP_IP, cp, library, logger, altitude=710, kernels_path="./kernels.temp.dir")
-    sc.start_cross()
+    sc.start()
 
 def prueba_black():
     logging.basicConfig(level=logging.DEBUG)
@@ -87,10 +87,10 @@ def prueba_track():
     #    extra_log_handlers=[handler])
     logger = common.create_default_logger(logging.DEBUG)
     st = aut.SunTracker(TCP_IP, 15, library=psc.SunLibrary.PYSOLAR, logger=logger)
-    st.start_tracking()
+    st.start()
 
 def main():
-    prueba_cross()
+    prueba_track()
 
 if __name__ == "__main__":
     main()

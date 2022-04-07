@@ -16,6 +16,7 @@ It exports the following functions:
 """
 
 """___Built-In Modules___"""
+from abc import ABC, abstractmethod
 from typing import Dict, Tuple
 import time
 import datetime
@@ -210,3 +211,19 @@ def exception_tracking(logger: logging.Logger, e: Exception, solys: solys2.Solys
         logger.error(str(eclose))
     if is_finished:
         is_finished.value = True
+
+class AutomationWorker(ABC):
+    @abstractmethod
+    def start(self):
+        """Start the automatic process in the thread."""
+        pass
+
+    @abstractmethod
+    def stop(self):
+        """Stop the automatic thread, although not immediately."""
+        pass
+
+    @abstractmethod
+    def is_finished(self) -> bool:
+        """Check if the thread has successfully finished executing."""
+        pass

@@ -38,3 +38,8 @@ error if it's too big even with the countdown.
 
 - Minor logging modifications.
 - Countdown is now logging level INFO instead of WARNING.
+
+- Changed CrossParameters class name to CalibrationParameters.
+- Created superclass for automation objects called AutomationWorker.
+- Functions of AutomationWorkers changed names to "start()" and "stop".
+- Added instrument callback as an optional parameter for Calibration Automation Workers.

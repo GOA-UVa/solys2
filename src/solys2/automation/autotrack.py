@@ -111,7 +111,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
     except Exception as e:
         autohelper.exception_tracking(logger, e, solys, is_finished)
 
-class _BodyTracker:
+class _BodyTracker(autohelper.AutomationWorker):
     """_BodyTracker
     Object that when created will create a thread executing the function of controlling the
     Solys2 so it tracks the selected body.
@@ -172,11 +172,11 @@ class _BodyTracker:
             self.cont_track, self.logger, port, password, self._is_finished, altitude,
             kernels_path, solys_delay))
 
-    def start_tracking(self):
+    def start(self):
         """Start tracking the previously selected body."""
         self.thread.start()
 
-    def stop_tracking(self):
+    def stop(self):
         """
         Stop the tracking of the tracked body. The connection with the Solys2 will be closed and
         the thread stopped.

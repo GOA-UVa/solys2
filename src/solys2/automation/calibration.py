@@ -20,7 +20,7 @@ It exports the following functions:
 
 """___Built-In Modules___"""
 from dataclasses import dataclass
-from typing import Tuple, List
+from typing import Tuple, List, Callable
 import time
 import datetime
 import logging
@@ -36,7 +36,7 @@ from . import autohelper
 from .. import common
 
 @dataclass
-class CrossParameters:
+class CalibrationParameters:
     """
     Parameters needed when performing a cross or a mesh over a Body.
 
@@ -58,7 +58,10 @@ class CrossParameters:
         Amount of degrees that are between each zenith cross point.
     countdown : float
         Amount of seconds that the Solys2 will wait before the ASD is calculated, logging
-        a countdown.
+        a countdown in level INFO following the format "COUNTDOWN:<value>", and the value
+        will go from the initial countdown value to 0, unless the given solys delays are
+        not sufficient, in which case the countdown will be reduced for every second that
+        it has been delayed in excess.
     post_wait : float
         Amount of seconds that the Solys2 will wait after the ASD has been calculated.
     """
@@ -72,11 +75,11 @@ class CrossParameters:
     post_wait: int
 
 def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
-    offsets: List[Tuple[float, float]], body_calc: psc.BodyCalculator, cp: CrossParameters,
+    offsets: List[Tuple[float, float]], body_calc: psc.BodyCalculator, cp: CalibrationParameters,
     mutex_cont: Lock = None, cont_track: common.ContainedBool = None,
     solys_delay: float = common.SOLYS_APPROX_DELAY,
     solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = common.ASD_DELAY):
+    instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
     """
     Perform a series of solys-synchronized offsets over a body, for the cross and mesh.
 
@@ -90,7 +93,7 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
         List of offsets (az, ze) that will be performed.
     body_calc : BodyCalculator
         Calculator that will be able to calculate the position of the body for a given date.
-    cp : CrossParameters
+    cp : CalibrationParameters
         Parameters needed when performing a cross/mesh over a Body.
     mutex_cont : Lock
         Mutex that controls the access to the variable cont_track.
@@ -106,6 +109,9 @@ def _perform_offsets_body(solys: solys2.Solys2, logger: logging.Logger,
         the "move position" command was sent, (for most cases).
     instrument_delay : float
         Approximate time in seconds that the measure instrument takes in each measurement.
+    inst_callback : Callable
+        Function that will be executed synchronously when the countdown reaches 0. If None
+        nothing will be executed. By default it's None.
     """
     stoppable: bool = False
     if mutex_cont and cont_track:
@@ -148,18 +154,24 @@ large. Increase the countdown or the values of the solys2 delay parameters."
             logger.info("COUNTDOWN:{}".format(sleep_time0-i))
             time.sleep(1)
         logger.info("COUNTDOWN:0")
+        if inst_callback:
+            logger.info("Executing callback function.")
+            inst_callback()
+        else:
+            logger.debug("Sleeping {} seconds, the instrument delay.".format(instrument_delay))
+            time.sleep(instrument_delay)
         sleep_time1 = cp.post_wait
         logger.debug("Waiting {} seconds (post).".format(sleep_time1))
         if sleep_time1 > 0:
             time.sleep(sleep_time1)
 
 def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
-    cross_params: CrossParameters, port: int = 15000, password: str = "solys",
+    cross_params: CalibrationParameters, port: int = 15000, password: str = "solys",
     is_finished: common.ContainedBool = None, altitude: float = 0,
     kernels_path: str = "./kernels", mutex_cont: Lock = None,
     cont_track: common.ContainedBool = None, solys_delay: float = common.SOLYS_APPROX_DELAY,
     solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = common.ASD_DELAY):
+    instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
     """
     Perform a cross over a body
 
@@ -171,7 +183,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         Body library that will be used to track the body. Moon or Sun.
     logger : logging.Logger
         Logger that will log out the log messages
-    cross_params : CrossParameters
+    cross_params : CalibrationParameters
         Parameters needed when performing a cross over a Body.
     port : int
         Access port. By default 15000.
@@ -199,6 +211,9 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         the "move position" command was sent, (for most cases).
     instrument_delay : float
         Approximate time in seconds that the measure instrument takes in each measurement.
+    inst_callback : Callable
+        Function that will be executed synchronously when the countdown reaches 0. If None
+        nothing will be executed. By default it's None.
     """
     try:
         # Connect with the Solys2 and set the initial configuration.
@@ -226,7 +241,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         logger.debug("Moved next to the body.")
         logger.info("Starting cross")
         _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track,
-            solys_delay, solys_delay_margin, instrument_delay)
+            solys_delay, solys_delay_margin, instrument_delay, inst_callback)
         solys.close()
         if is_finished:
             is_finished.value = True
@@ -234,7 +249,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
     except Exception as e:
         autohelper.exception_tracking(logger, e, solys, is_finished)
 
-class _BodyCross:
+class _BodyCross(autohelper.AutomationWorker):
     """_BodyCross
     Object that when created will create a thread executing the function of controlling the
     Solys2 so it performs a cross over the selected body.
@@ -254,18 +269,18 @@ class _BodyCross:
         Container for the boolean value that initially will be False, but it will be True
         when the thread has successfully ended execution.
     """
-    def __init__(self, ip: str, cross_params: CrossParameters, library: psc._BodyLibrary,
+    def __init__(self, ip: str, cross_params: CalibrationParameters, library: psc._BodyLibrary,
         logger: logging.Logger = None, port: int = 15000, password: str = "solys",
         altitude: float = 0, kernels_path: str = "./kernels",
         solys_delay: float = common.SOLYS_APPROX_DELAY,
         solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-        instrument_delay: float = common.ASD_DELAY):
+        instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
         """
         Parameters
         ----------
         ip : str
             IP of the solys.
-        cross_params : CrossParameters
+        cross_params : CalibrationParameters
             Parameters needed when performing a cross over a Body.
         library : _BodyLibrary
             Body library that will be used to track the body. Moon or Sun.
@@ -289,6 +304,9 @@ class _BodyCross:
             the "move position" command was sent, (for most cases).
         instrument_delay : float
             Approximate time in seconds that the measure instrument takes in each measurement.
+        inst_callback : Callable
+            Function that will be executed synchronously when the countdown reaches 0. If None
+            nothing will be executed. By default it's None.
         """
         self.mutex_cont = Lock()
         self.cont_track = common.ContainedBool(True)
@@ -299,13 +317,13 @@ class _BodyCross:
         # Create thread
         self.thread = Thread(target = _cross_body, args = (ip, library, self.logger, cross_params,
             port, password, self._is_finished, altitude, kernels_path, self.mutex_cont,
-            self.cont_track, solys_delay, solys_delay_margin, instrument_delay))
+            self.cont_track, solys_delay, solys_delay_margin, instrument_delay, inst_callback))
     
-    def start_cross(self):
+    def start(self):
         """Start the cross for the previously selected body."""
         self.thread.start()
     
-    def stop_cross(self):
+    def stop(self):
         """
         Stop the cross over the selected body. The connection with the Solys2 will be closed and
         the thread stopped.
@@ -336,19 +354,19 @@ class LunarCross(_BodyCross):
     Object that when created will create a thread executing the function of controlling the
     Solys2 so it performs a cross over the Moon.
     """
-    def __init__(self, ip: str, cross_params: CrossParameters,
+    def __init__(self, ip: str, cross_params: CalibrationParameters,
         library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
         logger: logging.Logger = None, port: int = 15000, password: str = "solys",
         altitude: float = 0, kernels_path: str = "./kernels",
         solys_delay: float = common.SOLYS_APPROX_DELAY,
         solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-        instrument_delay: float = common.ASD_DELAY):
+        instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
         """
         Parameters
         ----------
         ip : str
             IP of the solys.
-        cross_params : CrossParameters
+        cross_params : CalibrationParameters
             Parameters needed when performing a cross over a Body.
         library : MoonLibrary
             Lunar library that will be used to track the Moon.
@@ -372,28 +390,31 @@ class LunarCross(_BodyCross):
             the "move position" command was sent, (for most cases).
         instrument_delay : float
             Approximate time in seconds that the measure instrument takes in each measurement.
+        inst_callback : Callable
+            Function that will be executed synchronously when the countdown reaches 0. If None
+            nothing will be executed. By default it's None.
         """
         super().__init__(ip, cross_params, library, logger, port, password, altitude,
-            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay, inst_callback)
 
 class SolarCross(_BodyCross):
     """SolarCross
     Object that when created will create a thread executing the function of controlling the
     Solys2 so it performs a cross over the Sun.
     """
-    def __init__(self, ip: str, cross_params: CrossParameters,
+    def __init__(self, ip: str, cross_params: CalibrationParameters,
         library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
         logger: logging.Logger = None, port: int = 15000, password: str = "solys",
         altitude: float = 0, kernels_path: str = "./kernels",
         solys_delay: float = common.SOLYS_APPROX_DELAY,
         solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-        instrument_delay: float = common.ASD_DELAY):
+        instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
         """
         Parameters
         ----------
         ip : str
             IP of the solys.
-        cross_params : CrossParameters
+        cross_params : CalibrationParameters
             Parameters needed when performing a cross over a Body.
         library : SunLibrary
             Lunar library that will be used to track the Sun.
@@ -417,16 +438,19 @@ class SolarCross(_BodyCross):
             the "move position" command was sent, (for most cases).
         instrument_delay : float
             Approximate time in seconds that the measure instrument takes in each measurement.
+        inst_callback : Callable
+            Function that will be executed synchronously when the countdown reaches 0. If None
+            nothing will be executed. By default it's None.
         """
         super().__init__(ip, cross_params, library, logger, port, password, altitude,
-            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay, inst_callback)
 
-def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_params: CrossParameters,
+def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_params: CalibrationParameters,
     port: int = 15000, password: str = "solys", is_finished: common.ContainedBool = None,
     altitude: float = 0, kernels_path: str = "./kernels", mutex_cont: Lock = None,
     cont_track: common.ContainedBool = None, solys_delay: float = common.SOLYS_APPROX_DELAY,
     solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-    instrument_delay: float = common.ASD_DELAY):
+    instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
     """
     Perform a mesh/matrix over a body
 
@@ -438,7 +462,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         Body library that will be used to track the body. Moon or Sun.
     logger : logging.Logger
         Logger that will log out the log messages
-    mesh_params : CrossParameters
+    mesh_params : CalibrationParameters
         Parameters needed when performing a mesh over a Body.
     port : int
         Access port. By default 15000.
@@ -466,6 +490,9 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         the "move position" command was sent, (for most cases).
     instrument_delay : float
         Approximate time in seconds that the measure instrument takes in each measurement.
+    inst_callback : Callable
+        Function that will be executed synchronously when the countdown reaches 0. If None
+        nothing will be executed. By default it's None.
     """
     try:
         # Connect with the Solys2 and set the initial configuration.
@@ -494,7 +521,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         logger.debug("Moved next to the body.")
         logger.info("Starting mesh")
         _perform_offsets_body(solys, logger, offsets, body_calc, cp, mutex_cont, cont_track,
-            solys_delay, solys_delay_margin, instrument_delay)
+            solys_delay, solys_delay_margin, instrument_delay, inst_callback)
         solys.close()
         if is_finished:
             is_finished.value = True
@@ -502,7 +529,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
     except Exception as e:
         autohelper.exception_tracking(logger, e, solys, is_finished)
 
-class _BodyMesh:
+class _BodyMesh(autohelper.AutomationWorker):
     """_BodyMesh
     Object that when created will create a thread executing the function of controlling the
     Solys2 so it performs a mesh/matrix over the selected body.
@@ -522,18 +549,18 @@ class _BodyMesh:
         Container for the boolean value that initially will be False, but it will be True
         when the thread has successfully ended execution.
     """
-    def __init__(self, ip: str, mesh_params: CrossParameters, library: psc._BodyLibrary,
+    def __init__(self, ip: str, mesh_params: CalibrationParameters, library: psc._BodyLibrary,
         logger: logging.Logger = None, port: int = 15000, password: str = "solys",
         altitude: float = 0, kernels_path: str = "./kernels",
         solys_delay: float = common.SOLYS_APPROX_DELAY,
         solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-        instrument_delay: float = common.ASD_DELAY):
+        instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
         """
         Parameters
         ----------
         ip : str
             IP of the solys.
-        mesh_params : CrossParameters
+        mesh_params : CalibrationParameters
             Parameters needed when performing a mesh/matrix over a Body.
         library : _BodyLibrary
             Body library that will be used to track the body. Moon or Sun.
@@ -557,6 +584,9 @@ class _BodyMesh:
             the "move position" command was sent, (for most cases).
         instrument_delay : float
             Approximate time in seconds that the measure instrument takes in each measurement.
+        inst_callback : Callable
+            Function that will be executed synchronously when the countdown reaches 0. If None
+            nothing will be executed. By default it's None.
         """
         self.mutex_cont = Lock()
         self.cont_track = common.ContainedBool(True)
@@ -567,13 +597,13 @@ class _BodyMesh:
         # Create thread
         self.thread = Thread(target = _mesh_body, args = (ip, library, self.logger, mesh_params,
             port, password, self._is_finished, altitude, kernels_path, self.mutex_cont,
-            self.cont_track, solys_delay, solys_delay_margin, instrument_delay))
+            self.cont_track, solys_delay, solys_delay_margin, instrument_delay, inst_callback))
     
-    def start_mesh(self):
+    def start(self):
         """Start the mesh for the previously selected body."""
         self.thread.start()
     
-    def stop_mesh(self):
+    def stop(self):
         """
         Stop the mesh over the selected body. The connection with the Solys2 will be closed and
         the thread stopped.
@@ -604,19 +634,19 @@ class LunarMesh(_BodyMesh):
     Object that when created will create a thread executing the function of controlling the
     Solys2 so it performs a mesh/matrix over the Moon.
     """
-    def __init__(self, ip: str, mesh_params: CrossParameters,
+    def __init__(self, ip: str, mesh_params: CalibrationParameters,
         library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
         logger: logging.Logger = None, port: int = 15000, password: str = "solys",
         altitude: float = 0, kernels_path: str = "./kernels",
         solys_delay: float = common.SOLYS_APPROX_DELAY,
         solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-        instrument_delay: float = common.ASD_DELAY):
+        instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
         """
         Parameters
         ----------
         ip : str
             IP of the solys.
-        mesh_params : CrossParameters
+        mesh_params : CalibrationParameters
             Parameters needed when performing a mesh/matrix over a Body.
         library : MoonLibrary
             Moon library that will be used to track the Moon.
@@ -640,28 +670,31 @@ class LunarMesh(_BodyMesh):
             the "move position" command was sent, (for most cases).
         instrument_delay : float
             Approximate time in seconds that the measure instrument takes in each measurement.
+        inst_callback : Callable
+            Function that will be executed synchronously when the countdown reaches 0. If None
+            nothing will be executed. By default it's None.
         """
         super().__init__(ip, mesh_params, library, logger, port, password, altitude,
-            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay, inst_callback)
 
 class SolarMesh(_BodyMesh):
     """SolarMesh
     Object that when created will create a thread executing the function of controlling the
     Solys2 so it performs a mesh/matrix over the Sun.
     """
-    def __init__(self, ip: str, mesh_params: CrossParameters,
+    def __init__(self, ip: str, mesh_params: CalibrationParameters,
         library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
         logger: logging.Logger = None, port: int = 15000, password: str = "solys",
         altitude: float = 0, kernels_path: str = "./kernels",
         solys_delay: float = common.SOLYS_APPROX_DELAY,
         solys_delay_margin: float = common.SOLYS_DELAY_MARGIN,
-        instrument_delay: float = common.ASD_DELAY):
+        instrument_delay: float = common.ASD_DELAY, inst_callback: Callable = None):
         """
         Parameters
         ----------
         ip : str
             IP of the solys.
-        mesh_params : CrossParameters
+        mesh_params : CalibrationParameters
             Parameters needed when performing a mesh/matrix over a Body.
         library : SunLibrary
             Sun library that will be used to track the Sun.
@@ -685,9 +718,12 @@ class SolarMesh(_BodyMesh):
             the "move position" command was sent, (for most cases).
         instrument_delay : float
             Approximate time in seconds that the measure instrument takes in each measurement.
+        inst_callback : Callable
+            Function that will be executed synchronously when the countdown reaches 0. If None
+            nothing will be executed. By default it's None.
         """
         super().__init__(ip, mesh_params, library, logger, port, password, altitude,
-            kernels_path, solys_delay, solys_delay_margin, instrument_delay)
+            kernels_path, solys_delay, solys_delay_margin, instrument_delay, inst_callback)
 
 def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
     password: str = "solys", is_finished: common.ContainedBool = None,
