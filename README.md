@@ -1,6 +1,6 @@
 # solys2
 
-![Version 0.2.0-alpha1](https://img.shields.io/badge/version-0.2.0-alpha1-informational)
+![Version 0.2.0-alpha2](https://img.shields.io/badge/version-0.2.0-alpha2-informational)
 
 Python package for connecting and communicating with the Solys 2 via TCP/IP
 and setting it up to automatically track the moon or the sun.
@@ -23,8 +23,8 @@ University) for a campaign at the Izaña Atmospheric Observatory.
 
 ## Requirements
 
-- python>=3.8
-- numpy>=1.22.2
+- python>=3.7
+- numpy>=1.21.5
 - pylunar>=0.6.0
 - pysolar>=0.10
 - ephem>=4.1.3
