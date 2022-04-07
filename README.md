@@ -61,17 +61,17 @@ output = solys.send_command("HO")
 ### Automatic tracking
 
 ```python
-from solys2 import autotrack
+from solys2.automation import autotrack
 
 # Track the sun, sending a new position each 15 seconds, and logging the
 # information (movements, etc) to a file called "solys.log"
 st = autotrack.SunTracker(ip, 15, port, password, True, "solys.log")
 
 # Start tracking
-st.start_tracking()
+st.start()
 
 # Stop tracking the Sun
-st.stop_tracking()
+st.stop()
 ```
 
 ## Structure
