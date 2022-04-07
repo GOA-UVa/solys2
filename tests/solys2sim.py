@@ -14,11 +14,16 @@ current_zenith = 0
 azimuth_adj = 0
 zenith_adj = 0
 
+last_po_time = None
+
+DELAY = 5
+
 def server_thread(conn: socket.socket):
     global current_azimuth
     global current_zenith
     global azimuth_adj
     global zenith_adj
+    global last_po_time
     print("new connection")
     empties = 0
     while True:
@@ -32,6 +37,7 @@ def server_thread(conn: socket.socket):
             if cmd == "TI":
                 ret = "TI 2022 93 15 15 15"
             elif cmd == "PO":
+                last_po_time = time.time()
                 vals = str(data)[2:-3].split()
                 if int(vals[1]) == 0:
                     current_azimuth = float(vals[2])
@@ -39,7 +45,11 @@ def server_thread(conn: socket.socket):
                     current_zenith = float(vals[2])
                 ret = "PO"
             elif cmd == "CP":
-                ret = "CP {} {}".format(current_azimuth+azimuth_adj, current_zenith+zenith_adj)
+                current_po_time = time.time()
+                if last_po_time == None or last_po_time + DELAY <= current_po_time:
+                    ret = "CP {} {}".format(current_azimuth+azimuth_adj, current_zenith+zenith_adj)
+                else:
+                    ret = "CP {} {}".format(current_azimuth+azimuth_adj+1, current_zenith+zenith_adj+1)
             elif cmd == "AD":
                 vals = str(data)[2:-3].split()
                 if len(vals) <= 1:
