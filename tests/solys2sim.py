@@ -11,9 +11,14 @@ import threading
 current_azimuth = 0
 current_zenith = 0
 
+azimuth_adj = 0
+zenith_adj = 0
+
 def server_thread(conn: socket.socket):
     global current_azimuth
     global current_zenith
+    global azimuth_adj
+    global zenith_adj
     print("new connection")
     empties = 0
     while True:
@@ -34,7 +39,18 @@ def server_thread(conn: socket.socket):
                     current_zenith = float(vals[2])
                 ret = "PO"
             elif cmd == "CP":
-                ret = "CP {} {}".format(current_azimuth, current_zenith)
+                ret = "CP {} {}".format(current_azimuth+azimuth_adj, current_zenith+zenith_adj)
+            elif cmd == "AD":
+                vals = str(data)[2:-3].split()
+                if len(vals) <= 1:
+                    ret = "AD {} {}".format(azimuth_adj, zenith_adj)
+                else:
+                    print(vals)
+                    if int(vals[1]) == 0:
+                        azimuth_adj += float(vals[2])
+                    else:
+                        zenith_adj += float(vals[2])
+                    ret = "AD"
             else:
                 ret = "{} 1 1 1 1 1 1 1 1 1 1 1".format(cmd)
             print(ret)
