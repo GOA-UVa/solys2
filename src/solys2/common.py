@@ -25,7 +25,7 @@ from typing import List
 # import here
 
 """___Authorship___"""
-__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
+__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón, \
 Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/04/04"
 __maintainer__ = "Javier Gatón Herguedas"

@@ -31,7 +31,7 @@ from . import positioncalc as psc
 from .. import common as _common
 
 """___Authorship___"""
-__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
+__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón, \
 Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/04/05"
 __maintainer__ = "Javier Gatón Herguedas"
