@@ -173,8 +173,8 @@ def read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: l
         solys.set_azimuth(new_az)
         solys.set_zenith(new_ze)
         logger.info("Sent positions:")
-        logger.info("Azimuth: {} + {} + ({}).\nZenith: {} + {} + ({}).\n".format(az,
-            offset[0], new_az, ze, offset[1], new_ze))
+        logger.info("Azimuth: {} + {} + ({}).".format(az, offset[0], new_az))
+        logger.info("Zenith: {} + {} + ({}).\n".format(ze, offset[1], new_ze))
         wait_position_reached(solys, new_az+az_adj, new_ze+ze_adj, logger)
         dt = datetime.datetime.now(datetime.timezone.utc)
         logger.info("Finished moving at UTC datetime: {}.".format(dt))

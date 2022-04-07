@@ -145,9 +145,9 @@ countdown to {}, and sleeping an extra {}.".format(sleep_time0, sleep_mid))
 large. Increase the countdown or the values of the solys2 delay parameters."
                 raise Exception(error_msg)
         for i in range(sleep_time0):
-            logger.warning("COUNTDOWN:{}".format(sleep_time0-i))
+            logger.info("COUNTDOWN:{}".format(sleep_time0-i))
             time.sleep(1)
-        logger.warn("COUNTDOWN:0")
+        logger.info("COUNTDOWN:0")
         sleep_time1 = cp.post_wait
         logger.debug("Waiting {} seconds (post).".format(sleep_time1))
         if sleep_time1 > 0:

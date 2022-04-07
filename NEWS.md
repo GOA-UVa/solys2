@@ -35,3 +35,6 @@ should_check_time_solys.
 
 - Calibration takes away time of countdown in case solys delay was too big, and even raises an
 error if it's too big even with the countdown.
+
+- Minor logging modifications
+- Countdown is now logging level INFO instead of WARNING
