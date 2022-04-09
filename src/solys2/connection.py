@@ -19,7 +19,7 @@ import time
 # import here
 
 """___Authorship___"""
-__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón,\
+__author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón, \
 Roberto Román, Carlos Toledano, David Mateos'
 __created__ = "2022/03/09"
 __maintainer__ = "Javier Gatón Herguedas"
