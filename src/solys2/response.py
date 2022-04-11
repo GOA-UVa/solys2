@@ -3,12 +3,12 @@
 Module that contains functionalities for processing the Solys2 responses.
 
 It exports the following variables:
-    * ERROR_CODES : A dictionary containing all the error codes (and custom ones) with their
-        related error messages.
-    * INSTRUMENT_STATUS : A dictionary containing all instrument status related to the
-        instrument status code.
-    * FLAGS_STATUS : A dictionary containing all flags related to the instrument status
-        code.
+    * ERROR_CODES : A dictionary containing all the error codes (and custom ones) with their \
+related error messages.
+    * INSTRUMENT_STATUS : A dictionary containing all instrument status related to the \
+instrument status code.
+    * FLAGS_STATUS : A dictionary containing all flags related to the instrument status \
+code.
 
 It exports the following classes:
     * ErrorCode : Enum that contains all possible Solys2 error codes and some custom ones.
@@ -99,7 +99,7 @@ class OutCode(Enum):
     ANSWERED: The response was a successful answer for the command.
     ANSWERED_NO_NUMS: The response was a successful answer but it didn't contain numbers.
     ANSWERED_VALUE_ERROR: The response was a successful answer but there was an error converting
-        the numbers from strings.
+    the numbers from strings.
     """
     NONE = -1
     ERROR = 0

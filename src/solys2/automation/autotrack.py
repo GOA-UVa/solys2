@@ -3,10 +3,10 @@
 Module that contains the functionalities of performing automatic actions with the Solys2.
 
 It exports the following classes:
-    * MoonTracker : Object that contains the thread that controls the Solys2 for tracking
-        automatically the Moon.
-    * SunTracker : Object that contains the thread that controls the Solys2 for tracking
-        automatically the Sun.
+    * MoonTracker : Object that contains the thread that controls the Solys2 for tracking \
+automatically the Moon.
+    * SunTracker : Object that contains the thread that controls the Solys2 for tracking \
+automatically the Sun.
 """
 
 """___Built-In Modules___"""

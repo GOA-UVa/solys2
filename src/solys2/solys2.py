@@ -3,11 +3,11 @@
 Module that encapsulates and abstracts an interface for interacting with the Solys2.
 
 It exports the following classes:
-    * Solys2 : Class that encapsulates and abstracts the connection and interaction
-        with the Solys2.
+    * Solys2 : Class that encapsulates and abstracts the connection and interaction \
+with the Solys2.
     * CommandOutput : Dataclass that stores the output of a Solys2 message somewhat processed.
-    * SolysFunction : Enum that stores the functions that the Solys2 can be set to with the
-        FU command.
+    * SolysFunction : Enum that stores the functions that the Solys2 can be set to with the \
+FU command.
     * SolysException : Exception raised when there was an error with the Solys2.
 
 It exports the following functions:

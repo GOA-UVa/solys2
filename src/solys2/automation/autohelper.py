@@ -4,15 +4,15 @@ Module that contains the functionalities that are used for performing automatic 
 with the Solys2.
 
 It exports the following functions:
-    * get_body_calculator : Obtain the BodyCalculator object corresponding to the given
-        parameters.
-    * check_time_solys : Check the solys internal time against the computer time and log
-        an info or warning message if necessary.
+    * get_body_calculator : Obtain the BodyCalculator object corresponding to the given \
+parameters.
+    * check_time_solys : Check the solys internal time against the computer time and log \
+an info or warning message if necessary.
     * wait_position_reached : Waits until the solys is approx. pointing at the given position.
     * read_and_move : Reads some information from the solys and writes it down to the logger.
-        Then it moves it to a position using the given position function and parameters.
-    * exception_tracking : When an execution fails and must end a set of actions must be
-        taken in order to communicate it and synchronize it.
+Then it moves it to a position using the given position function and parameters.
+    * exception_tracking : When an execution fails and must end a set of actions must be \
+taken in order to communicate it and synchronize it.
 """
 
 """___Built-In Modules___"""
