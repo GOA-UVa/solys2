@@ -71,11 +71,12 @@ class SolysFunction(Enum):
     """
     Functions that the Solys2 can be set to with the FU command.
 
-    NO_FUNCTION : The tracker will not move.
-    STANDARD_OPERATION : The tracker moves in response to motion commands. Homes to (90,90).
-    STANDARD_OPERATION_REVERSE : The tracker moves in response to motion commands. Homes to (90,0).
-    SUNTRACKING : Following the sun.
-    ACTIVE_TRACKING : Following the sun using the sun sensor for minor adjustment.
+    - NO_FUNCTION : The tracker will not move.
+    - STANDARD_OPERATION : The tracker moves in response to motion commands. Homes to (90,90).
+    - STANDARD_OPERATION_REVERSE : The tracker moves in response to motion commands. \
+Homes to (90,0).
+    - SUNTRACKING : Following the sun.
+    - ACTIVE_TRACKING : Following the sun using the sun sensor for minor adjustment.
     """
     NO_FUNCTION = 0
     STANDARD_OPERATION = 1
