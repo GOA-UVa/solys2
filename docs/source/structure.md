@@ -18,4 +18,4 @@ The main modules that can be used are the module **solys2**, which allowes the u
 with the SOLYS2 easily, and **autotrack** and **calibration**, which let the user perform automated
 functions like tracking the moon or performing a calibration cross over the moon.
 
-![Component diagram](https://github.com/GOA-UVa/solys2/blob/master/doc/solys2_components.png)
+![Component diagram](https://github.com/GOA-UVa/solys2/blob/master/docs/img/solys2_components.png)
