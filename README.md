@@ -22,6 +22,10 @@ registered trademarks of their respective owners.
 This software was initially developed by GOA-UVa (the Atmospheric Optics Group of Valladolid
 University) for a campaign at the Izaña Atmospheric Observatory.
 
+## Documentation
+
+The complete documentation can be found at [solys2.readthedocs.io](https://solys2.readthedocs.io/).
+
 ## Requirements
 
 - python>=3.7
