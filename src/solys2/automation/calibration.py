@@ -30,10 +30,16 @@ from threading import Lock, Thread
 import numpy as np
 
 """___Solys2 Modules___"""
-from .. import solys2
-from . import positioncalc as psc
-from . import autohelper
-from .. import common
+try:
+    from .. import solys2
+    from . import positioncalc as psc
+    from . import autohelper
+    from .. import common
+except:
+    from solys2.automation import positioncalc as psc
+    from solys2.automation import autohelper
+    from solys2 import common
+    from solys2 import solys2
 
 @dataclass
 class CalibrationParameters:
