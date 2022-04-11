@@ -4,18 +4,18 @@ This module contains the functionalities related to different calibration method
 most of them used by the GOA-UVa.
 
 It exports the following classes:
-    * LunarCross : Object that when created will create a thread executing the function of controlling the
-        Solys2 so it performs a cross over the Moon.
-    * SolarCross : Object that when created will create a thread executing the function of controlling the
-        Solys2 so it performs a cross over the Sun.
-    * LunarMesh : Object that when created will create a thread executing the function of controlling the
-        Solys2 so it performs a mesh over the Moon.
-    * SolarMesh : Object that when created will create a thread executing the function of controlling the
-        Solys2 so it performs a mesh over the Sun.
+    * LunarCross : Object that when created will create a thread executing the function of \
+controlling the Solys2 so it performs a cross over the Moon.
+    * SolarCross : Object that when created will create a thread executing the function of \
+controlling the Solys2 so it performs a cross over the Sun.
+    * LunarMesh : Object that when created will create a thread executing the function of \
+controlling the Solys2 so it performs a mesh over the Moon.
+    * SolarMesh : Object that when created will create a thread executing the function of \
+controlling the Solys2 so it performs a mesh over the Sun.
 
 It exports the following functions:
-    * black_moon : Perform a black for the moon. Point to a position where the moon is not present so the noise
-        can be calculated. (Opposite azimuth and zenith = 45).
+    * black_moon : Perform a black for the moon. Point to a position where the moon is not \
+present so the noise can be calculated. (Opposite azimuth and zenith = 45).
 """
 
 """___Built-In Modules___"""

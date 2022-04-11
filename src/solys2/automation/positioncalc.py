@@ -6,24 +6,24 @@ and the sun using different libraries, like ephem, pysolar or SPICE (spicedmoon 
 It exports the following classes:
     * MoonLibrary : Enum that contains all available moon calculation libraries.
     * SunLibrary : Enum that contains all available sun calculation libraries.
-    * BodyCalculator : Abstract class of an object that calculates a celestial body's zenith 
-        and azimuth for a given location at a given datetime.
-    * MoonCalculator : Abstract class of an object that calculates the lunar zenith and azimuth for a given location
-        at a given datetime.
-    * SunCalculator : Abstract class of an object that calculates the solar zenith and azimuth for a given location
-        at a given datetime.
-    * PylunarMoonCalc : Object that calculates the lunar zenith and azimuth for a given location
-        at a given datetime, using pylunar library.
-    * EphemMoonCalc : Object that calculates the lunar zenith and azimuth for a given location
-        at a given datetime, using ephem library.
-    * SpiceMoonCalc : Object that calculates the lunar zenith and azimuth for a given location
-        at a given datetime, using spicedmoon (SPICE) library.
-    * PysolarSunCalc : Object that calculates the solar zenith and azimuth for a given location
-        at a given datetime, using pysolar library.
-    * EphemSunCalc : Object that calculates the solar zenith and azimuth for a given location
-        at a given datetime, using ephem library.
-    * SpiceSunCalc : Object that calculates the solar zenith and azimuth for a given location
-        at a given datetime, using spicedsun (SPICE) library.
+    * BodyCalculator : Abstract class of an object that calculates a celestial body's zenith \
+and azimuth for a given location at a given datetime.
+    * MoonCalculator : Abstract class of an object that calculates the lunar zenith and \
+azimuth for a given location at a given datetime.
+    * SunCalculator : Abstract class of an object that calculates the solar zenith and \
+azimuth for a given location at a given datetime.
+    * PylunarMoonCalc : Object that calculates the lunar zenith and azimuth for a given \
+location at a given datetime, using pylunar library.
+    * EphemMoonCalc : Object that calculates the lunar zenith and azimuth for a given location \
+at a given datetime, using ephem library.
+    * SpiceMoonCalc : Object that calculates the lunar zenith and azimuth for a given location \
+at a given datetime, using spicedmoon (SPICE) library.
+    * PysolarSunCalc : Object that calculates the solar zenith and azimuth for a given location \
+at a given datetime, using pysolar library.
+    * EphemSunCalc : Object that calculates the solar zenith and azimuth for a given location \
+at a given datetime, using ephem library.
+    * SpiceSunCalc : Object that calculates the solar zenith and azimuth for a given location \
+at a given datetime, using spicedsun (SPICE) library.
 """
 
 """___Built-In Modules___"""

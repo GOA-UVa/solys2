@@ -4,8 +4,8 @@ Module that encapsulates and abstracts functions that allow the low-level commun
 with the Solys2.
 
 It exports the following classes:
-    * SolysConnection : Class that allows directly sending commands and receiving messages
-        from the Solys2.
+    * SolysConnection : Class that allows directly sending commands and receiving messages \
+from the Solys2.
 """
 
 """___Built-In Modules___"""
