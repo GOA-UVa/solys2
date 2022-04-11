@@ -4,3 +4,6 @@ dist
 *.temp.*
 __pycache__
 docs/build
+docs/_build
+docs/_templates
+docs/_static
