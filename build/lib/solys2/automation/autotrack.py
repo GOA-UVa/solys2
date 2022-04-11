@@ -19,16 +19,10 @@ from threading import Thread, Lock
 # import here
 
 """___Solys2 Modules___"""
-try:
-    from . import autohelper
-    from .. import solys2
-    from . import positioncalc as psc
-    from .. import common
-except:
-    from solys2.automation import autohelper
-    from solys2 import solys2
-    from solys2.automation import positioncalc as psc
-    from solys2 import common
+from . import autohelper
+from .. import solys2
+from . import positioncalc as psc
+from .. import common
 
 """___Authorship___"""
 __author__ = 'Javier Gatón Herguedas, Juan Carlos Antuña Sánchez, Ramiro González Catón, \
