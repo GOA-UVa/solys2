@@ -36,10 +36,10 @@ try:
     from . import autohelper
     from .. import common
 except:
-    from solys2 import solys2
     from solys2.automation import positioncalc as psc
     from solys2.automation import autohelper
     from solys2 import common
+    from solys2 import solys2
 
 @dataclass
 class CalibrationParameters:
