@@ -75,6 +75,7 @@ def get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger:
             logger.error("ERROR obtaining coordinates: {}".format(solys2.translate_error(ll_com.err)))
         else:
             logger.error("ERROR obtaining coordinates. Unknown error.")
+    logger.debug("Latitude: {:.4f}. Longitude: {:.4f}".format(lat, lon))
     switcher: Dict[int, psc.BodyCalculator] = {
         psc._BodyLibrary.EPHEM_MOON.value: psc.EphemMoonCalc,
         psc._BodyLibrary.SPICEDMOON.value: psc.SpiceMoonCalc,
@@ -131,8 +132,8 @@ def wait_position_reached(solys: solys2.Solys2, az: float, ze: float, logger: lo
         pos_dif = abs(az - prev_az) +  abs(ze - prev_ze)
         if pos_dif <= 0.01:
             break
-        logger.debug("Position difference too large: {:0.4f}. (Expected vs Actual)".format(pos_dif))
-        logger.debug("Azimuth {:0.4f} vs {:0.4f}. Zenith: {:0.4f} vs {:0.4f}.".format(az, prev_az,
+        logger.debug("Position difference too large: {:.4f}. (Expected vs Actual)".format(pos_dif))
+        logger.debug("Azimuth {:.4f} vs {:.4f}. Zenith: {:.4f} vs {:.4f}.".format(az, prev_az,
             ze, prev_ze))
         logger.debug("Sleeping 1 second...")
         time.sleep(1)
@@ -162,9 +163,9 @@ def read_and_move(solys: solys2.Solys2, body_calc: psc.BodyCalculator, logger: l
     should_check_time_solys = (dt.minute == 0 )
     try:
         prev_az, prev_ze, _ = solys.get_current_position()
-        logger.info("Current Position: Azimuth: {:0.4f}, Zenith: {:0.4f}.".format(prev_az, prev_ze))
+        logger.info("Current Position: Azimuth: {:.4f}, Zenith: {:.4f}.".format(prev_az, prev_ze))
         az_adj, ze_adj, _ = solys.adjust()
-        logger.debug("Adjustment of {:0.4f} and {:0.4f}.".format(az_adj, ze_adj))
+        logger.debug("Adjustment of {:.4f} and {:.4f}.".format(az_adj, ze_adj))
         dt = datetime.datetime.now(datetime.timezone.utc)
         if should_check_time_solys:
             logger.debug("Checking computer time against Solys internal time.")

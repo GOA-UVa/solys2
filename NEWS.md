@@ -36,3 +36,4 @@ error if it's too big even with the countdown.
 - Fixed some solys2 return typing type from int to float.
 - Reduced some logging output number of floating point decimals. (.4f)
 - Not obtaining sun quadrant sensor information.
+- Printing coordinates in debug.
