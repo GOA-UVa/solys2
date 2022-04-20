@@ -540,7 +540,7 @@ class Solys2:
         output = self.send_command("PO 1 94.9")
         return output
 
-    def get_planned_position(self) -> Tuple[int, int, CommandOutput]:
+    def get_planned_position(self) -> Tuple[float, float, CommandOutput]:
         """Position (PO)
         Obtain the positions that the Solys sais it's going to.
 
@@ -564,7 +564,7 @@ class Solys2:
             return _DEFAULT_VAL_ERR, _DEFAULT_VAL_ERR, output
         return output.nums[0], output.nums[1], output
     
-    def get_current_position(self) -> Tuple[int, int, CommandOutput]:
+    def get_current_position(self) -> Tuple[float, float, CommandOutput]:
         """Current Position (CP)
         Obtain the positions where the Solys is at the moment.
 

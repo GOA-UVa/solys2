@@ -1,6 +1,6 @@
 # solys2
 
-![Version 0.2.0](https://img.shields.io/badge/version-0.2.0-informational)
+![Version 0.2.1](https://img.shields.io/badge/version-0.2.1-informational)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Python package for connecting and communicating with the Solys 2 via TCP/IP
@@ -139,6 +139,21 @@ cp = cali.CalibrationParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 1)
 logger = common.create_default_logger(logging.DEBUG)
 library=psc.MoonLibrary.EPHEM_MOON
 lc = cali.LunarCross(TCP_IP, cp, library, logger)
+lc.start()
+```
+
+Now, instead of having to take the measures manually, the following code block uses a
+given callback "measure()":
+
+```python
+from solys2.automation import calibration as cali
+from solys2.automation import positioncalc as psc
+from solys2 import common
+
+cp = cali.CalibrationParameters(-1, 1, 0.1, -1, 1, 0.1, 2, 0)
+logger = common.create_default_logger(logging.DEBUG)
+library=psc.MoonLibrary.EPHEM_MOON
+lc = cali.LunarCross(TCP_IP, cp, library, logger, inst_callback=measure)
 lc.start()
 ```
 
