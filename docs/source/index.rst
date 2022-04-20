@@ -6,8 +6,8 @@
 Welcome to solys2's documentation!
 ==================================
 
-.. image:: https://img.shields.io/badge/version-0.2.0-informational
-    :alt: Version 0.2.0
+.. image:: https://img.shields.io/badge/version-0.2.1-informational
+    :alt: Version 0.2.1
     
 .. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
     :target: https://www.gnu.org/licenses/gpl-3.0
@@ -27,7 +27,7 @@ Documentation overview
    installation
    usage
    structure
-   modules
+   solys2
 
 
 Indices and tables
