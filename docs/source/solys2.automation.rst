@@ -1,9 +1,6 @@
 solys2.automation package
 =========================
 
-Submodules
-----------
-
 solys2.automation.autohelper module
 -----------------------------------
 
@@ -32,14 +29,6 @@ solys2.automation.positioncalc module
 -------------------------------------
 
 .. automodule:: solys2.automation.positioncalc
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: solys2.automation
    :members:
    :undoc-members:
    :show-inheritance:

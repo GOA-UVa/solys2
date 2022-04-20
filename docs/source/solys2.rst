@@ -9,9 +9,6 @@ Subpackages
 
    solys2.automation
 
-Submodules
-----------
-
 solys2.common module
 --------------------
 
@@ -40,14 +37,6 @@ solys2.solys2 module
 --------------------
 
 .. automodule:: solys2.solys2
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: solys2
    :members:
    :undoc-members:
    :show-inheritance:
