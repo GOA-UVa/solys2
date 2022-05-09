@@ -1,6 +1,6 @@
 # Introduction
 
-![Version 0.2.1](https://img.shields.io/badge/version-0.2.1-informational)
+![Version 0.2.2](https://img.shields.io/badge/version-0.2.2-informational)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Python package for connecting and communicating with the Solys 2 via TCP/IP
