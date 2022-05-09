@@ -14,6 +14,7 @@ from typing import List
 import time
 import logging
 from threading import Thread, Lock
+from typing import Callable
 
 """___Third-Party Modules___"""
 # import here
@@ -42,7 +43,8 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
     cont_track: common.ContainedBool, logger: logging.Logger, port: int = 15000,
     password: str = "solys", is_finished: common.ContainedBool = None,
     altitude: float = 0, kernels_path: str = "./kernels",
-    solys_delay: float = common.SOLYS_APPROX_DELAY):
+    solys_delay: float = common.SOLYS_APPROX_DELAY, inst_callback: Callable = None,
+    instrument_delay: float = common.ASD_DELAY):
     """
     Track a celestial body
 
@@ -76,6 +78,11 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
     solys_delay : float
         Approximate delay in seconds between telling the Solys2 to move to a position and
         the Solys2 saying that it reached that position.
+    inst_callback : Callable
+        Function that will be executed synchronously when the Solys points to the body correctly.
+        If None nothing will be executed. By default it's None.
+    instrument_delay : float
+        Approximate time in seconds that the measure instrument takes in each measurement.
 
     Raises
     ------
@@ -94,7 +101,11 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         autohelper.check_time_solys(solys, logger)
         # Start tracking in a loop
         sleep_time = 0
-        time_offset = ((seconds - solys_delay) / 2.0) + solys_delay
+        inst_measures = inst_callback is not None
+        if not inst_measures:
+            time_offset = ((seconds - solys_delay) / 2.0) + solys_delay
+        else:
+            time_offset = ((instrument_delay) / 2.0) + solys_delay
         t0 = time.time()
         mutex_cont.acquire()
         cont_track.value = True
@@ -102,6 +113,8 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
             mutex_cont.release()
             logger.debug("Waited {} seconds.\n".format(sleep_time))
             autohelper.read_and_move(solys, body_calc, logger, datetime_offset=time_offset)
+            if inst_measures:
+                inst_callback()
             tf = time.time()
             tdiff = tf - t0
             sleep_time = (seconds - tdiff)
@@ -140,7 +153,8 @@ class _BodyTracker(autohelper.AutomationWorker):
     def __init__(self, ip: str, seconds: float, library: psc._BodyLibrary, port: int = 15000,
         password: str = "solys", logger: logging.Logger = None,
         altitude: float = 0, kernels_path: str = "./kernels",
-        solys_delay: float = common.SOLYS_APPROX_DELAY):
+        solys_delay: float = common.SOLYS_APPROX_DELAY, inst_callback: Callable = None,
+        instrument_delay: float = common.ASD_DELAY):
         """
         Parameters
         ----------
@@ -166,6 +180,11 @@ class _BodyTracker(autohelper.AutomationWorker):
         solys_delay : float
             Approximate delay in seconds between telling the Solys2 to move to a position and
             the Solys2 saying that it reached that position.
+        inst_callback : Callable
+            Function that will be executed synchronously when the Solys points to the body correctly.
+            If None nothing will be executed. By default it's None.
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
         """
         self.mutex_cont = Lock()
         self.cont_track = common.ContainedBool(True)
@@ -176,7 +195,7 @@ class _BodyTracker(autohelper.AutomationWorker):
         # Create thread
         self.thread = Thread(target = _track_body, args = (ip, seconds, library, self.mutex_cont,
             self.cont_track, self.logger, port, password, self._is_finished, altitude,
-            kernels_path, solys_delay))
+            kernels_path, solys_delay, inst_callback, instrument_delay))
 
     def start(self):
         """Start tracking the previously selected body."""
@@ -218,7 +237,8 @@ class MoonTracker(_BodyTracker):
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         logger: logging.Logger = None, library: psc.MoonLibrary = psc.MoonLibrary.EPHEM_MOON,
         altitude: float = 0, kernels_path: str = "./kernels",
-        solys_delay: float = common.SOLYS_APPROX_DELAY):
+        solys_delay: float = common.SOLYS_APPROX_DELAY, inst_callback: Callable = None,
+        instrument_delay: float = common.ASD_DELAY):
         """
         Parameters
         ----------
@@ -244,9 +264,14 @@ class MoonTracker(_BodyTracker):
         solys_delay : float
             Approximate delay in seconds between telling the Solys2 to move to a position and
             the Solys2 saying that it reached that position.
+        inst_callback : Callable
+            Function that will be executed synchronously when the Solys points to the body correctly.
+            If None nothing will be executed. By default it's None.
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
         """
         super().__init__(ip, seconds, library, port, password, logger, altitude,
-            kernels_path, solys_delay)
+            kernels_path, solys_delay, inst_callback, instrument_delay)
 
 class SunTracker(_BodyTracker):
     """SunTracker
@@ -256,7 +281,8 @@ class SunTracker(_BodyTracker):
     def __init__(self, ip: str, seconds: float, port: int = 15000, password: str = "solys",
         logger: logging.Logger = None, library: psc.SunLibrary = psc.SunLibrary.PYSOLAR,
         altitude: float = 0, kernels_path: str = "./kernels",
-        solys_delay: float = common.SOLYS_APPROX_DELAY):
+        solys_delay: float = common.SOLYS_APPROX_DELAY, inst_callback: Callable = None,
+        instrument_delay: float = common.ASD_DELAY):
         """
         Parameters
         ----------
@@ -282,6 +308,11 @@ class SunTracker(_BodyTracker):
         solys_delay : float
             Approximate delay in seconds between telling the Solys2 to move to a position and
             the Solys2 saying that it reached that position.
+        inst_callback : Callable
+            Function that will be executed synchronously when the Solys points to the body correctly.
+            If None nothing will be executed. By default it's None.
+        instrument_delay : float
+            Approximate time in seconds that the measure instrument takes in each measurement.
         """
         super().__init__(ip, seconds, library, port, password, logger, altitude,
-            kernels_path, solys_delay)
+            kernels_path, solys_delay, inst_callback, instrument_delay)
