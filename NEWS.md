@@ -41,3 +41,6 @@ error if it's too big even with the countdown.
 ## v0.2.2
 - \_BodyTracker, MoonTracker and SunTracker now allow receiving a instrument callback function
 as a parameter.
+
+## v0.2.3
+- Using spicedmoon>=1.0.1
