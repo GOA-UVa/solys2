@@ -37,3 +37,10 @@ error if it's too big even with the countdown.
 - Reduced some logging output number of floating point decimals. (.4f)
 - Not obtaining sun quadrant sensor information.
 - Printing coordinates in debug.
+
+## v0.2.2
+- \_BodyTracker, MoonTracker and SunTracker now allow receiving a instrument callback function
+as a parameter.
+
+## v0.2.3
+- Using spicedmoon>=1.0.1
