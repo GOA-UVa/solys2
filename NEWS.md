@@ -48,3 +48,6 @@ as a parameter.
 ## v0.2.4
 - Added libraries SPICEDMOONSAFE and SPICEDSUNSAFE, which use the SPICE libraries but in case an error
 happens, they use the most similar library as a backup instead of raising an Exception.
+
+## v0.2.5
+- Added logger to SPICE position calculators, so it can log out when it's using the backup library.
