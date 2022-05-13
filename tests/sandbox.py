@@ -86,7 +86,7 @@ def prueba_track():
     #st = aut.SunTracker(TCP_IP, 15, TCP_PORT, "solys", True, "./log.out.temp.txt", psc.SunLibrary.SPICEDSUN, altitude=710, kernels_path="./kernels.temp.dir",
     #    extra_log_handlers=[handler])
     logger = common.create_default_logger(logging.DEBUG)
-    st = aut.SunTracker(TCP_IP, 15, library=psc.SunLibrary.PYSOLAR, logger=logger)
+    st = aut.SunTracker(TCP_IP, 15, library=psc.SunLibrary.SPICEDSUNSAFE, logger=logger)
     st.start()
 
 def main():

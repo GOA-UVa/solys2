@@ -81,6 +81,16 @@ class BodyCalculator(ABC):
 
     @abstractmethod
     def __init__(self, lat: float, lon: float):
+        """
+        Parameters
+        ----------
+        lat : float
+            Latitude of the location for which to calculate the celestial body's
+            zenith and azimuth
+        lon : float
+            Longitude of the location for which to calculate the celestial body's
+            zenith and azimuth
+        """
         pass
 
     @abstractmethod
@@ -106,19 +116,44 @@ class _BodyLibrary(Enum):
     EPHEM_MOON = 0
     SPICEDMOON = 1
     PYLUNAR = 2
+    SPICEDMOONSAFE = 3
     PYSOLAR = 100
     EPHEM_SUN = 101
     SPICEDSUN = 102
+    SPICEDSUNSAFE = 103
 
 class MoonLibrary(Enum):
+    """
+    Enum that represents the library that can be used for calculating the lunar position.
+
+    EPHEM: Library that is very close to the correct data from SPICE, and doesn't require the presence of extra
+files. This is the default one, although the error might be too big for some users.
+    SPICEDMOON: Library that uses NASA's data. The most exact one, but requires the presence of kernels files.
+    PYLUNAR: Library that is very incorrect for some punctual data. Usage not recommended.
+    SPICEDMOONSAFE: Like SPICEDMOON, but in case that it fails (which is very rare but possible) it uses EPHEM
+library as a backup library instead of raising an Exception.
+    """
     EPHEM_MOON = 0
     SPICEDMOON = 1
     PYLUNAR = 2
+    SPICEDMOONSAFE = 3
 
 class SunLibrary(Enum):
+    """
+    Enum that represents the library that can be used for calculating the solar position.
+    
+    PYSOLAR: Library that is very close to the correct data from SPICE, and doesn't require the presence of extra
+files. This is the default one. The errors are related to the sunrise and sunset.
+    EPHEM: Library that is also close to the correct data from SPICE, but not as much as pysolar. The errors
+are related to the sunrise and sunset.
+    SPICEDSUN: Library that uses NASA's data. The most exact one, but requires the presence of kernels files.
+    SPICEDSUNSAFE: Like SPICEDSUN, but in case that it fails (which is very rare but possible) it uses PYSOLAR
+library as a backup library instead of raising an Exception.
+    """
     PYSOLAR = 100
     EPHEM_SUN = 101
     SPICEDSUN = 102
+    SPICEDSUNSAFE = 103
 
 class MoonCalculator(BodyCalculator):
     """
@@ -252,11 +287,32 @@ class SpiceMoonCalc(MoonCalculator):
     at a given datetime, using spicedmoon (SPICE) library.
     """
 
-    def __init__(self, lat: float, lon: float, alt: float = 0, kernels = "./kernels"):
+    def __init__(self, lat: float, lon: float, alt: float = 0, kernels = "./kernels",
+        retry_nospice: bool = False):
+        """
+        Parameters
+        ----------
+        lat : float
+            Latitude of the location for which to calculate the Moon's
+            zenith and azimuth
+        lon : float
+            Longitude of the location for which to calculate the Moon's
+            zenith and azimuth
+        alt : float
+            Height (in meters) of the location for which to calculate the Moon's
+            zenith and azimuth
+        kernels : str
+            Path where the directory containing the SPICE kernel files is located
+        retry_nospice : bool
+            SPICE rarely fails, but in case it does, if this parameter is true it will
+            try to calculate the result with the most similar library instead of raising
+            an Exception.
+        """
         self.lat = lat
         self.lon = lon
         self.alt = alt
         self.kernels = kernels
+        self.retry_nospice = retry_nospice
 
     def get_position(self, dt: datetime) -> Tuple[float, float]:
         """
@@ -275,9 +331,16 @@ class SpiceMoonCalc(MoonCalculator):
             Lunar zenith calculated.
         """
         dts_str = [dt.strftime('%Y-%m-%d %H:%M:%S')]
-        mds = spicedmoon.get_moon_datas(self.lat, self.lon, self.alt, dts_str, self.kernels)
-        az = mds[0].azimuth
-        ze = mds[0].zenith
+        try:
+            mds = spicedmoon.get_moon_datas(self.lat, self.lon, self.alt, dts_str, self.kernels)
+            az = mds[0].azimuth
+            ze = mds[0].zenith
+        except Exception as e:
+            if self.retry_nospice:
+                calc = EphemMoonCalc(self.lat, self.lon)
+                az, ze = calc.get_position(dt)
+            else:
+                raise e
         return az, ze
 
 class PysolarSunCalc(SunCalculator):
@@ -353,11 +416,32 @@ class SpiceSunCalc(SunCalculator):
     at a given datetime, using spicedmoon (SPICE) library.
     """
 
-    def __init__(self, lat: float, lon: float, alt: float = 0, kernels = "./kernels"):
+    def __init__(self, lat: float, lon: float, alt: float = 0, kernels = "./kernels",
+        retry_nospice: bool = False):
+        """
+        Parameters
+        ----------
+        lat : float
+            Latitude of the location for which to calculate the Moon's
+            zenith and azimuth
+        lon : float
+            Longitude of the location for which to calculate the Moon's
+            zenith and azimuth
+        alt : float
+            Height (in meters) of the location for which to calculate the Moon's
+            zenith and azimuth
+        kernels : str
+            Path where the directory containing the SPICE kernel files is located
+        retry_nospice : bool
+            SPICE rarely fails, but in case it does, if this parameter is true it will
+            try to calculate the result with the most similar library instead of raising
+            an Exception.
+        """
         self.lat = lat
         self.lon = lon
         self.alt = alt
         self.kernels = kernels
+        self.retry_nospice = retry_nospice
 
     def get_position(self, dt: datetime) -> Tuple[float, float]:
         """
@@ -376,7 +460,14 @@ class SpiceSunCalc(SunCalculator):
             Solar zenith calculated.
         """
         dts_str = [dt.strftime('%Y-%m-%d %H:%M:%S')]
-        mds = spicedsun.get_sun_datas(self.lat, self.lon, self.alt, dts_str, self.kernels)
-        az = mds[0].azimuth
-        ze = mds[0].zenith
+        try:
+            mds = spicedsun.get_sun_datas(self.lat, self.lon, self.alt, dts_str, self.kernels)
+            az = mds[0].azimuth
+            ze = mds[0].zenith
+        except Exception as e:
+            if self.retry_nospice:
+                calc = PysolarSunCalc(self.lat, self.lon)
+                az, ze = calc.get_position(dt)
+            else:
+                raise e
         return az, ze
