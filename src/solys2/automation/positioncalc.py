@@ -30,6 +30,7 @@ at a given datetime, using spicedsun (SPICE) library.
 from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
+import logging
 from typing import Tuple
 import math
 
@@ -288,7 +289,7 @@ class SpiceMoonCalc(MoonCalculator):
     """
 
     def __init__(self, lat: float, lon: float, alt: float = 0, kernels = "./kernels",
-        retry_nospice: bool = False):
+        retry_nospice: bool = False, logger: logging.Logger = None):
         """
         Parameters
         ----------
@@ -307,12 +308,16 @@ class SpiceMoonCalc(MoonCalculator):
             SPICE rarely fails, but in case it does, if this parameter is true it will
             try to calculate the result with the most similar library instead of raising
             an Exception.
+        logger : Logger
+            Logger that will log out important messages, like when has SPICE failed and it
+            has used the backup library.
         """
         self.lat = lat
         self.lon = lon
         self.alt = alt
         self.kernels = kernels
         self.retry_nospice = retry_nospice
+        self.logger = logger
 
     def get_position(self, dt: datetime) -> Tuple[float, float]:
         """
@@ -337,6 +342,9 @@ class SpiceMoonCalc(MoonCalculator):
             ze = mds[0].zenith
         except Exception as e:
             if self.retry_nospice:
+                if self.logger:
+                    self.logger.warning(str(e))
+                    self.logger.warning("SPICE failed, using ephem instead")
                 calc = EphemMoonCalc(self.lat, self.lon)
                 az, ze = calc.get_position(dt)
             else:
@@ -417,7 +425,7 @@ class SpiceSunCalc(SunCalculator):
     """
 
     def __init__(self, lat: float, lon: float, alt: float = 0, kernels = "./kernels",
-        retry_nospice: bool = False):
+        retry_nospice: bool = False, logger: logging.Logger = None):
         """
         Parameters
         ----------
@@ -436,12 +444,16 @@ class SpiceSunCalc(SunCalculator):
             SPICE rarely fails, but in case it does, if this parameter is true it will
             try to calculate the result with the most similar library instead of raising
             an Exception.
+        logger : Logger
+            Logger that will log out important messages, like when has SPICE failed and it
+            has used the backup library.
         """
         self.lat = lat
         self.lon = lon
         self.alt = alt
         self.kernels = kernels
         self.retry_nospice = retry_nospice
+        self.logger = logger
 
     def get_position(self, dt: datetime) -> Tuple[float, float]:
         """
@@ -466,6 +478,9 @@ class SpiceSunCalc(SunCalculator):
             ze = mds[0].zenith
         except Exception as e:
             if self.retry_nospice:
+                if self.logger:
+                    self.logger.warning(str(e))
+                    self.logger.warning("SPICE failed, using pysolar instead")
                 calc = PysolarSunCalc(self.lat, self.lon)
                 az, ze = calc.get_position(dt)
             else:

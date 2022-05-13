@@ -98,7 +98,7 @@ def get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger:
             library.value == psc._BodyLibrary.SPICEDSUNSAFE.value:
             logger.debug("SPICE SAFE")
             retry = True
-        return body_calc_class(lat, lon, altitude, kernels_path, retry)
+        return body_calc_class(lat, lon, altitude, kernels_path, retry, logger)
     return body_calc_class(lat, lon)
 
 def check_time_solys(solys: solys2.Solys2, logger: logging.Logger):
