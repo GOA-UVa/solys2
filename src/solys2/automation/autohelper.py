@@ -79,17 +79,26 @@ def get_body_calculator(solys: solys2.Solys2, library: psc._BodyLibrary, logger:
     switcher: Dict[int, psc.BodyCalculator] = {
         psc._BodyLibrary.EPHEM_MOON.value: psc.EphemMoonCalc,
         psc._BodyLibrary.SPICEDMOON.value: psc.SpiceMoonCalc,
+        psc._BodyLibrary.SPICEDMOONSAFE.value: psc.SpiceMoonCalc,
         psc._BodyLibrary.PYLUNAR.value: psc.PylunarMoonCalc,
         psc._BodyLibrary.PYSOLAR.value: psc.PysolarSunCalc,
         psc._BodyLibrary.EPHEM_SUN.value: psc.EphemSunCalc,
-        psc._BodyLibrary.SPICEDSUN.value: psc.SpiceSunCalc
+        psc._BodyLibrary.SPICEDSUN.value: psc.SpiceSunCalc,
+        psc._BodyLibrary.SPICEDSUNSAFE.value: psc.SpiceSunCalc
     }
     body_calc_class = switcher[library.value]
     logger.debug("Using {} library.".format(library.name))
     if library.value == psc._BodyLibrary.SPICEDMOON.value or \
-        library.value == psc._BodyLibrary.SPICEDSUN.value:
+        library.value == psc._BodyLibrary.SPICEDSUN.value or \
+        library.value == psc._BodyLibrary.SPICEDMOONSAFE.value or \
+        library.value == psc._BodyLibrary.SPICEDSUNSAFE.value:
         logger.debug("Using SPICE.")
-        return body_calc_class(lat, lon, altitude, kernels_path)
+        retry = False
+        if library.value == psc._BodyLibrary.SPICEDMOONSAFE.value or \
+            library.value == psc._BodyLibrary.SPICEDSUNSAFE.value:
+            logger.debug("SPICE SAFE")
+            retry = True
+        return body_calc_class(lat, lon, altitude, kernels_path, retry)
     return body_calc_class(lat, lon)
 
 def check_time_solys(solys: solys2.Solys2, logger: logging.Logger):
