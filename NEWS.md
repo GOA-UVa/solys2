@@ -45,6 +45,6 @@ as a parameter.
 ## v0.2.3
 - Using spicedmoon>=1.0.1
 
-## NEWS
+## v0.2.4
 - Added libraries SPICEDMOONSAFE and SPICEDSUNSAFE, which use the SPICE libraries but in case an error
 happens, they use the most similar library as a backup instead of raising an Exception.

@@ -132,6 +132,8 @@ For the Sun:
 files. This is the default one. The errors are related to the sunrise and sunset.
 - **ephem**: Library that is also close to the correct data from SPICE, but not as much as pysolar. The errors
 are related to the sunrise and sunset.
+- **spicedsunsafe**: Like spicedsun, but in case that it fails (which is very rare but possible) it uses pysolar
+library as a backup library instead of raising an Exception.
 
 
 For the Moon:
@@ -139,6 +141,8 @@ For the Moon:
 - **ephem**: Library that is very close to the correct data from SPICE, and doesn't require the presence of extra
 files. This is the default one, although the error might be too big for some users.
 - **pylunar**: Library that is very incorrect for some punctual data. Usage not recommended.
+- **spicedmoonsafe**: Like spicedmoon, but in case that it fails (which is very rare but possible) it uses ephem
+library as a backup library instead of raising an Exception.
 
 ### SPICE
 
