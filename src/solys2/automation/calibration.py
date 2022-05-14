@@ -207,7 +207,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         Mutex that controls the access to the variable cont_track
     cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
-        continue.
+        continue. It should be initialized to True.
     solys_delay : float
         Approximate delay in seconds between telling the Solys2 to move to a position and
         the Solys2 saying that it reached that position.

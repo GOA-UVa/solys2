@@ -51,3 +51,6 @@ happens, they use the most similar library as a backup instead of raising an Exc
 
 ## v0.2.5
 - Added logger to SPICE position calculators, so it can log out when it's using the backup library.
+
+## v0.2.6
+- Solved bug where if the tracking is stopped right after starting it, it entered an infinite loop.
