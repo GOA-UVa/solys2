@@ -82,10 +82,14 @@ The following code block explains how to track the sun using the module.
 
 ```python
 from solys2.automation import autotrack
+from solys2.automation import positioncalc as psc
+from solys2 import common
+import logging
 
+logger = common.create_default_logger(logging.DEBUG)
 # Track the sun, sending a new position each 15 seconds, and logging the
-# information (movements, etc) to a file called "solys.log"
-st = autotrack.SunTracker(ip, 15, port, password, True, "solys.log")
+# information (movements, etc) to stdout.
+st = aut.SunTracker(ip, 15, port, password, logger, psc.SunLibrary.PYSOLAR)
 
 # Start tracking
 st.start()
@@ -137,8 +141,8 @@ from solys2 import common
 
 cp = cali.CalibrationParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 1)
 logger = common.create_default_logger(logging.DEBUG)
-library=psc.MoonLibrary.EPHEM_MOON
-lc = cali.LunarCross(TCP_IP, cp, library, logger)
+library = psc.MoonLibrary.EPHEM_MOON
+lc = cali.LunarCross(ip, cp, library, logger)
 lc.start()
 ```
 
@@ -152,8 +156,8 @@ from solys2 import common
 
 cp = cali.CalibrationParameters(-1, 1, 0.1, -1, 1, 0.1, 2, 0)
 logger = common.create_default_logger(logging.DEBUG)
-library=psc.MoonLibrary.EPHEM_MOON
-lc = cali.LunarCross(TCP_IP, cp, library, logger, inst_callback=measure)
+library = psc.MoonLibrary.EPHEM_MOON
+lc = cali.LunarCross(ip, cp, library, logger, inst_callback=measure)
 lc.start()
 ```
 
@@ -172,8 +176,8 @@ from solys2 import common
 
 cp = cali.CalibrationParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 1)
 logger = common.create_default_logger(logging.DEBUG)
-library=psc.SunLibrary.PYSOLAR
-sc = cali.SolarCross(TCP_IP, cp, library, logger)
+library = psc.SunLibrary.PYSOLAR
+sc = cali.SolarCross(ip, cp, library, logger)
 sc.start()
 ```
 
