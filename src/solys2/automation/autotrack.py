@@ -60,7 +60,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
         Mutex that controls the access to the variable cont_track
     cont_track : ContainedBool
         Container for the boolean value that represents if the tracking must stop or if it should
-        continue.
+        continue. It should be initialized to True.
     logger : logging.Logger
         Logger that will log out the log messages
     port : int
@@ -108,7 +108,6 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
             time_offset = ((instrument_delay) / 2.0) + solys_delay
         t0 = time.time()
         mutex_cont.acquire()
-        cont_track.value = True
         while cont_track.value:
             mutex_cont.release()
             logger.debug("Waited {} seconds.\n".format(sleep_time))
