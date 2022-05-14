@@ -133,7 +133,7 @@ from solys2 import common
 cp = cali.CalibrationParameters(-1, 1, 0.1, -1, 1, 0.1, 5, 1)
 logger = common.create_default_logger(logging.DEBUG)
 library = psc.SunLibrary.PYSOLAR
-sc = cali.SolarCross(ip, cp, library, logger)
+sc = cali.SolarMesh(ip, cp, library, logger)
 sc.start()
 ```
 
