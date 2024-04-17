@@ -39,11 +39,13 @@ def server_thread(conn: socket.socket):
             elif cmd == "PO":
                 last_po_time = time.time()
                 vals = str(data)[2:-3].split()
-                if int(vals[1]) == 0:
+                ret = "PO"
+                if len(vals) == 1:
+                    ret = f"PO {current_azimuth} {current_zenith}"
+                elif int(vals[1]) == 0:
                     current_azimuth = float(vals[2])
                 else:
                     current_zenith = float(vals[2])
-                ret = "PO"
             elif cmd == "CP":
                 current_po_time = time.time()
                 if last_po_time == None or last_po_time + DELAY <= current_po_time:
