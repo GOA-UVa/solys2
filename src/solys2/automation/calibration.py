@@ -221,6 +221,7 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         Function that will be executed synchronously when the countdown reaches 0. If None
         nothing will be executed. By default it's None.
     """
+    solys = None
     try:
         # Connect with the Solys2 and set the initial configuration.
         solys = solys2.Solys2(ip, port, password)
@@ -500,6 +501,7 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         Function that will be executed synchronously when the countdown reaches 0. If None
         nothing will be executed. By default it's None.
     """
+    solys = None
     try:
         # Connect with the Solys2 and set the initial configuration.
         solys = solys2.Solys2(ip, port, password)
@@ -760,6 +762,7 @@ def black_moon(ip: str, logger: logging.Logger, port: int = 15000,
         Directory where the needed SPICE kernels are stored. Used only if SPICE library
         is selected.
     """
+    solys = None
     try:
         solys = solys2.Solys2(ip, port, password)
         solys.set_power_save(False)

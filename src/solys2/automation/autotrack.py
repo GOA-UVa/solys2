@@ -89,6 +89,7 @@ def _track_body(ip: str, seconds: float, library: psc._BodyLibrary, mutex_cont: 
     SolysException
         If an error happens when stablishing connection with the Solys2 for the first time.
     """
+    solys = None
     try:
         # Connect with the Solys2 and set the initial configuration.
         solys = solys2.Solys2(ip, port, password)
