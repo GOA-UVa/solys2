@@ -117,7 +117,7 @@ def _create_solys_exception(error_code: str, raw_response: str = None) -> SolysE
     if raw_response != None:
         sec_msg = "\nRaw response: {}.".format(raw_response)
     err_msg = "ERROR {}: {}.{}".format(err, err_msg, sec_msg)
-    if error_code == 3:
+    if error_code == '3':
         return SolysUnrecognizedCmdException(err_msg)
     return SolysException(err_msg)
 
