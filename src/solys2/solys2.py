@@ -244,6 +244,12 @@ class Solys2:
             err = ""
         return CommandOutput(str_out, nums, out, err)
 
+
+    def _send_password(self, recursion: int = 0) -> CommandOutput:
+        cmd = 'PW ' +  self.password
+        output = self.send_command(cmd, recursion)
+        return output
+
     def send_password(self, recursion: int = 0) -> CommandOutput:
         """Change password (PW)
         Send the password to the solys, authenticating this connection.
@@ -267,8 +273,7 @@ class Solys2:
         output : CommandOutput
             Output of the command, data received from solys.
         """
-        cmd = 'PW ' +  self.password
-        output = self.send_command(cmd, recursion)
+        output = self._send_password(recursion)
         self.lift_protection()
         return output
 
@@ -299,7 +304,7 @@ class Solys2:
             output = self.send_command(cmd, recursion)
         except SolysUnrecognizedCmdException:
             # PR 0 only appears in some solys2 machines
-            return self.send_password(recursion)
+            return self._send_password(recursion)
         return output
 
     def adjust(self) -> Tuple[float, float, CommandOutput]:
