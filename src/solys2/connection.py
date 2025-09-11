@@ -32,7 +32,7 @@ _SECS_TIMEOUT = 10
 def _add_checksum(s: str) -> str:
     s += ' '
     chs = 0
-    bs = bytes(s)
+    bs = bytes(s, 'ascii')
     for b in bs:
         chs += b
     while chs < 130 or chs > 223:
