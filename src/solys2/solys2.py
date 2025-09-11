@@ -156,11 +156,11 @@ class Solys2:
         self.closed = True
 
         self.connect()
-        #self.send_password()
-        #self.lift_protection()
+        self.send_password()
+        self.lift_protection()
 
-        #self.adjust()
-        #self.version()
+        self.adjust()
+        self.version()
 
     def connect(self):
         """
