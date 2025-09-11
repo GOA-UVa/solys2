@@ -145,6 +145,7 @@ class SolysConnection:
             except:
                 break
         self.sock.setblocking(True)
+        self.sock.settimeout(_SECS_TIMEOUT)
 
     def close(self) -> None:
         """
