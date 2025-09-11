@@ -77,7 +77,7 @@ class SolysConnection:
         Socket that will be connected to the Solys2.
     """
 
-    def __init__(self, ip: str, port: int):
+    def __init__(self, ip: str, port: int, timeout: float = _SECS_TIMEOUT):
         """
         Parameters
         ----------
@@ -86,6 +86,7 @@ class SolysConnection:
         port : int
             Connection port of the Solys2.
         """
+        self._timeout = timeout
         self.connect(ip, port)
 
     def connect(self, ip: str, port: int):
@@ -100,7 +101,7 @@ class SolysConnection:
             Connection port of the Solys2.
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(_SECS_TIMEOUT)
+        s.settimeout(self._timeout)
         s.connect((ip, port))
         self.sock = s
 
@@ -145,7 +146,7 @@ class SolysConnection:
             except:
                 break
         self.sock.setblocking(True)
-        self.sock.settimeout(_SECS_TIMEOUT)
+        self.sock.settimeout(self._timeout)
 
     def close(self) -> None:
         """
