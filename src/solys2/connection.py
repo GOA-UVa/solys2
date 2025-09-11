@@ -34,10 +34,10 @@ def _add_checksum(s: str) -> str:
     chs = 0
     bs = bytes(s, 'ascii')
     for b in bs:
-        chs += b
+        chs += b%256
     while chs < 130 or chs > 223:
         s += '^'
-        chs += ord(s[-1])
+        chs += ord(s[-1])%256
     s += chr(256-chs)
     return s
 
