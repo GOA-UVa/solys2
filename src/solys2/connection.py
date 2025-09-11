@@ -58,7 +58,7 @@ def _send_command(s: socket.socket, command: str) -> str:
     response : str
         Immediate response given by the Solys2.
     """
-    s.sendall(bytes(_add_checksum(command) + "\n", "ascii"))
+    s.sendall(bytes(_add_checksum(command) + "\r\n", "ascii"))
     rec = str(s.recv(_RECV_BUFFER_SIZE), "ascii")
     return rec
 
