@@ -177,6 +177,10 @@ def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[flo
         # Otherwise, the answer is not ready yet
         out_code = OutCode.NONE
         numbers = [-1]
+    print(numbers)
+    print(out_code)
+    print(err_code)
+    print('AAAAAAAAAAAAAAAAAAAAA')
     return numbers, out_code, err_code
 
 INSTRUMENT_STATUS: Dict[int, str] = {
