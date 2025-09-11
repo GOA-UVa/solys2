@@ -89,7 +89,11 @@ class SolysException(Exception):
     Exception raised when there was an error in the communication with the Solys2, or the message
     was unexpected.
     """
-    pass
+
+
+class SolysUnrecognizedCmdException(SolysException):
+    """Exception raised when the Solys2 returns error code 3: Unrecognized command."""
+
 
 def _create_solys_exception(error_code: str, raw_response: str = None) -> SolysException:
     """
@@ -112,7 +116,10 @@ def _create_solys_exception(error_code: str, raw_response: str = None) -> SolysE
     sec_msg = ""
     if raw_response != None:
         sec_msg = "\nRaw response: {}.".format(raw_response)
-    return SolysException("ERROR {}: {}.{}".format(err, err_msg, sec_msg))
+    err_msg = "ERROR {}: {}.{}".format(err, err_msg, sec_msg)
+    if error_code == 3:
+        return SolysUnrecognizedCmdException(err_msg)
+    return SolysException(err_msg)
 
 class Solys2:
     """Solys2
@@ -288,7 +295,11 @@ class Solys2:
             Output of the command, data received from solys.
         """
         cmd = 'PR 0'
-        output = self.send_command(cmd, recursion)
+        try:
+            output = self.send_command(cmd, recursion)
+        except SolysUnrecognizedCmdException:
+            # PR 0 only appears in some solys2 machines
+            return self.send_password(recursion)
         return output
 
     def adjust(self) -> Tuple[float, float, CommandOutput]:
