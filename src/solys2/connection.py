@@ -29,6 +29,18 @@ __status__ = "Development"
 _RECV_BUFFER_SIZE = 1024
 _SECS_TIMEOUT = 10
 
+def _add_checksum(s: str) -> str:
+    s += ' '
+    chs = 0
+    bs = bytes(s)
+    for b in bs:
+        chs += b
+    while chs < 130 or chs > 223:
+        s += '^'
+        chs += ord(s[-1])
+    s += chr(256-chs)
+    return s
+
 def _send_command(s: socket.socket, command: str) -> str:
     """
     Sends the command through the given socket, and receives the response.
@@ -46,8 +58,8 @@ def _send_command(s: socket.socket, command: str) -> str:
     response : str
         Immediate response given by the Solys2.
     """
-    s.sendall(bytes(command + "\n", "utf-8"))
-    rec = str(s.recv(_RECV_BUFFER_SIZE), "utf-8")
+    s.sendall(bytes(_add_checksum(command) + "\n", "ascii"))
+    rec = str(s.recv(_RECV_BUFFER_SIZE), "ascii")
     return rec
 
 def _recv(s: socket.socket) -> str:
@@ -64,7 +76,7 @@ def _recv(s: socket.socket) -> str:
     response : str
         Response given by the Solys2.
     """
-    rec = str(s.recv(_RECV_BUFFER_SIZE), "utf-8")
+    rec = str(s.recv(_RECV_BUFFER_SIZE), "ascii")
     return rec
 
 class SolysConnection:
