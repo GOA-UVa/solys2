@@ -153,8 +153,10 @@ def process_response(s: str, cmd: str, hex_nums: bool = False) -> Tuple[List[flo
     if rstrip.startswith(cmd[:2]):
         # If the response starts with the command, it is answering that command
         temp = re.sub(cmd, '', rstrip)
-        unwateted = re.sub('(\d|\.|\ |\-|E\-)', '', temp)
-        only_nums = re.sub(unwateted, '', temp)
+        unwanted = re.sub('(\d|\.|\ |\-|E\-)', '', temp)
+        for v in unwanted:
+            temp = temp.replace(v, ' ')
+        only_nums = temp
         if len(only_nums) > 0:
             only_nums_split = only_nums.split()
             try:

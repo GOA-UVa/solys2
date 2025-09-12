@@ -218,11 +218,12 @@ def exception_tracking(logger: logging.Logger, e: Exception, solys: solys2.Solys
     """
     logger.error("Stopped tracking body.")
     logger.error(str(e))
-    try:
-        solys.close()
-    except Exception as eclose:
-        logger.error("Error closing connection.")
-        logger.error(str(eclose))
+    if solys:
+        try:
+            solys.close()
+        except Exception as eclose:
+            logger.error("Error closing connection.")
+            logger.error(str(eclose))
     if is_finished:
         is_finished.value = True
 

@@ -29,6 +29,18 @@ __status__ = "Development"
 _RECV_BUFFER_SIZE = 1024
 _SECS_TIMEOUT = 10
 
+def _add_checksum(s: str) -> str:
+    s += ' '
+    chs = 0
+    bs = bytes(s, 'ascii')
+    for b in bs:
+        chs = (chs + b)%256
+    while chs < 130 or chs > 223:
+        s += '^'
+        chs = (chs + ord(s[-1]))%256
+    s += chr(256-chs)
+    return s
+
 def _send_command(s: socket.socket, command: str) -> str:
     """
     Sends the command through the given socket, and receives the response.
@@ -46,8 +58,8 @@ def _send_command(s: socket.socket, command: str) -> str:
     response : str
         Immediate response given by the Solys2.
     """
-    s.sendall(bytes(command + "\n", "utf-8"))
-    rec = str(s.recv(_RECV_BUFFER_SIZE), "utf-8")
+    s.sendall(bytes(_add_checksum(command) + "\r\n", "ascii"))
+    rec = str(s.recv(_RECV_BUFFER_SIZE), "ascii")
     return rec
 
 def _recv(s: socket.socket) -> str:
@@ -64,7 +76,7 @@ def _recv(s: socket.socket) -> str:
     response : str
         Response given by the Solys2.
     """
-    rec = str(s.recv(_RECV_BUFFER_SIZE), "utf-8")
+    rec = str(s.recv(_RECV_BUFFER_SIZE), "ascii")
     return rec
 
 class SolysConnection:
@@ -77,7 +89,7 @@ class SolysConnection:
         Socket that will be connected to the Solys2.
     """
 
-    def __init__(self, ip: str, port: int):
+    def __init__(self, ip: str, port: int, timeout: float = _SECS_TIMEOUT):
         """
         Parameters
         ----------
@@ -86,6 +98,7 @@ class SolysConnection:
         port : int
             Connection port of the Solys2.
         """
+        self._timeout = timeout
         self.connect(ip, port)
 
     def connect(self, ip: str, port: int):
@@ -100,7 +113,7 @@ class SolysConnection:
             Connection port of the Solys2.
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(_SECS_TIMEOUT)
+        s.settimeout(self._timeout)
         s.connect((ip, port))
         self.sock = s
 
@@ -145,6 +158,7 @@ class SolysConnection:
             except:
                 break
         self.sock.setblocking(True)
+        self.sock.settimeout(self._timeout)
 
     def close(self) -> None:
         """
