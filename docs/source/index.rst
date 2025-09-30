@@ -6,8 +6,8 @@
 Welcome to solys2's documentation!
 ==================================
 
-.. image:: https://img.shields.io/badge/version-0.2.7-informational
-    :alt: Version 0.2.7
+.. image:: https://img.shields.io/badge/version-0.2.8-informational
+    :alt: Version 0.2.8
     
 .. image:: https://img.shields.io/badge/License-GPLv3-blue.svg
     :target: https://www.gnu.org/licenses/gpl-3.0
