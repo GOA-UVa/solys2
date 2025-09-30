@@ -61,3 +61,6 @@ happens, they use the most similar library as a backup instead of raising an Exc
 - Fixed a bug when processing responses: The non-numeric characters where
   located and removed with a regex, which failed if they were special regex characters.
 - Avoid failing with some Solys2 that don't have the `PO 0` command to lift the protection, for those it's enough to use the `PW` command.
+
+## v0.2.8
+- The checksum isn't added by default at the end of the commands, as it fails in some machines.
