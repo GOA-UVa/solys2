@@ -41,7 +41,7 @@ def _add_checksum(s: str) -> str:
     s += chr(256-chs)
     return s
 
-def _send_command(s: socket.socket, command: str) -> str:
+def _send_command(s: socket.socket, command: str, add_checksum: bool = False) -> str:
     """
     Sends the command through the given socket, and receives the response.
 
@@ -52,13 +52,18 @@ def _send_command(s: socket.socket, command: str) -> str:
         the respons from.
     command : str
         Command that will be sent to the Solys2.
+    add_checksum : bool
+        If True, it will add the checksum after the message as it's specified in the Solys2 guide.
+        By default it's False, as it malfunctions in some machines.
 
     Returns
     -------
     response : str
         Immediate response given by the Solys2.
     """
-    s.sendall(bytes(_add_checksum(command) + "\r\n", "ascii"))
+    if add_checksum:
+        command = _add_checksum(command)
+    s.sendall(bytes(command + "\r\n", "ascii"))
     rec = str(s.recv(_RECV_BUFFER_SIZE), "ascii")
     return rec
 
@@ -89,7 +94,7 @@ class SolysConnection:
         Socket that will be connected to the Solys2.
     """
 
-    def __init__(self, ip: str, port: int, timeout: float = _SECS_TIMEOUT):
+    def __init__(self, ip: str, port: int, timeout: float = _SECS_TIMEOUT, add_checksum: bool = False):
         """
         Parameters
         ----------
@@ -97,8 +102,13 @@ class SolysConnection:
             IP of the Solys2.
         port : int
             Connection port of the Solys2.
+        timeout: float
+            Timeout for the solys2 connection socket. By default it's 10.
+        add_checksum: bool
+            If True, it will add the checksum after the command in the byte message as it's specified in the Solys2 guide. By default it's False.
         """
         self._timeout = timeout
+        self._add_checksum = add_checksum
         self.connect(ip, port)
 
     def connect(self, ip: str, port: int):
@@ -131,7 +141,7 @@ class SolysConnection:
         response : str
             Immediate response given by the Solys2.
         """
-        return _send_command(self.sock, command)
+        return _send_command(self.sock, command, self._add_checksum)
 
     def recv_msg(self) -> str:
         """

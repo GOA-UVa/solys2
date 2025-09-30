@@ -141,7 +141,7 @@ class Solys2:
         Adjustments of the motors. [adjustment_0, adjustment_1].
     """
 
-    def __init__(self, ip: str, port: int = 15000, password: str = "solys"):
+    def __init__(self, ip: str, port: int = 15000, password: str = "solys", add_checksum: bool = False):
         """
         Parameters
         ----------
@@ -151,6 +151,8 @@ class Solys2:
             Connection port of the Solys2. Default is 15000.
         password : str
             User password for the Solys2. Default is "solys".
+        add_checksum: bool
+            If True, it will add the checksum after the command in the byte message as it's specified in the Solys2 guide. By default it's False.
 
         Raises
         ------
@@ -160,6 +162,7 @@ class Solys2:
         self.ip = ip
         self.port = port
         self.password = password
+        self._add_checksum = add_checksum
         self.closed = True
 
         self.connect()
@@ -175,7 +178,7 @@ class Solys2:
         """
         if not self.closed:
             self.close()
-        self.connection = connection.SolysConnection(self.ip, self.port)
+        self.connection = connection.SolysConnection(self.ip, self.port, add_checksum=self._add_checksum)
         self.closed = False
 
     def send_command(self, cmd: str, recursion: int = 0) -> CommandOutput:
