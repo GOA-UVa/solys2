@@ -21,7 +21,7 @@ copyright = '2022, GOA-UVa (The Atmospheric Optics Group of Valladolid Universit
 author = 'GOA-UVa (The Atmospheric Optics Group of Valladolid University)'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2.8'
+release = '0.2.9'
 
 
 # -- General configuration ---------------------------------------------------
