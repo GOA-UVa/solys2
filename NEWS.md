@@ -64,3 +64,6 @@ happens, they use the most similar library as a backup instead of raising an Exc
 
 ## v0.2.8
 - The checksum isn't added by default at the end of the commands, as it fails in some machines.
+
+## v0.2.9
+- Fixed ranges in calibration ops (cross and mesh). Due to float handling in np.arange, an extra value was being introduced incorrectly.
