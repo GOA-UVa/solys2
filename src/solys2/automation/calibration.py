@@ -240,9 +240,9 @@ def _cross_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger,
         # Generating the offsets
         offsets: List[Tuple[float, float]] = \
             [(i, 0) for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset +
-                cp.azimuth_step, cp.azimuth_step)]
+                cp.azimuth_step/2, cp.azimuth_step)]
         offsets += [(0, i) for i in np.arange(cp.zenith_min_offset, cp.zenith_max_offset +
-            cp.zenith_step, cp.zenith_step)]
+            cp.zenith_step/2, cp.zenith_step)]
         logger.debug("Moving next to the body...")
         autohelper.read_and_move(solys, body_calc, logger, (0,0))
         logger.debug("Moved next to the body.")
@@ -519,9 +519,9 @@ def _mesh_body(ip: str, library: psc._BodyLibrary, logger: logging.Logger, mesh_
         autohelper.check_time_solys(solys, logger)
         # Generating the offsets
         offsets: List[Tuple[float, float]] = []
-        for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset + cp.azimuth_step,
+        for i in np.arange(cp.azimuth_min_offset, cp.azimuth_max_offset + cp.azimuth_step/2,
                 cp.azimuth_step):
-            for j in np.arange(cp.zenith_min_offset, cp.zenith_max_offset + cp.zenith_step,
+            for j in np.arange(cp.zenith_min_offset, cp.zenith_max_offset + cp.zenith_step/2,
                     cp.zenith_step):
                 offsets.append((i,j))
         logger.debug("Moving next to the body...")
